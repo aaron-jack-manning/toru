@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
+mod git;
 mod vault;
 mod error;
 mod tasks;
@@ -16,7 +17,7 @@ struct Args {
 }
 
 #[derive(clap::Subcommand, Debug)]
-#[clap(version, about, author, global_setting = clap::AppSettings::DisableHelpSubcommand)]
+#[clap(version, about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
 enum Command {
     /// Create a new task.
     New {
@@ -42,6 +43,11 @@ enum Command {
     /// Mark a task as complete.
     Complete {
         id : tasks::Id,
+    },
+    /// Run Git commands at the root of the vault.
+    #[clap(trailing_var_arg=true)]
+    Git {
+        args : Vec<String>,
     },
     /// Commands for interacting with vaults.
     #[clap(subcommand)]
@@ -150,6 +156,9 @@ fn program() -> Result<(), error::Error> {
                     task.data.complete = true;
                     task.save()?;
                     println!("Marked task {} as complete", colour::id(&id.to_string()));
+                },
+                Git { args } => {
+                    git::run_command(args, vault_folder)?;
                 },
                 Vault(_) => unreachable!(),
             }

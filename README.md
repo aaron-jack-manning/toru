@@ -17,8 +17,6 @@ A (currently in development) to do app for the command line.
     - Options for which field to order by, and how to order (ascending or descending)
     - Options for which columns to include
     - If no values given, read a set of defaults from a `list.toml` file, which can be edited from a similar command
-- Git integration
-    - `toru git` should run the provided Git command directly at the root of the current vault
 - Ability to view, edit, delete, etc. using name
     - Have a file containing a serialized `HashMap<String, Vec<Id>>`
     - Disallow numerical names and have command automatically identify if it is a name or Id
@@ -28,3 +26,6 @@ A (currently in development) to do app for the command line.
     - Error if any circular dependencies are introduced
     - Make sure dependencies written to file are only those that could be successfully created
 - Automatically added recurring notes
+
+## Bugs:
+- Git commands which automatically open a text editor after don't work as expected

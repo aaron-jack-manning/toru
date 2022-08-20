@@ -2,6 +2,7 @@ use crate::colour;
 
 use std::io;
 use std::fmt;
+use std::str;
 
 #[derive(Debug)]
 pub enum Error {
@@ -10,6 +11,7 @@ pub enum Error {
     Trash(trash::Error),
     TomlDe(toml::de::Error),
     TomlSer(toml::ser::Error),
+    Utf8(str::Utf8Error),
     Generic(String),
 }
 
@@ -21,6 +23,7 @@ impl fmt::Display for Error {
             Error::Trash(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::TomlDe(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::TomlSer(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
+            Error::Utf8(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::Generic(message) => write!(f, "{}", message),
         }
     }
@@ -53,5 +56,11 @@ impl From<toml::de::Error> for Error {
 impl From<toml::ser::Error> for Error {
     fn from(err : toml::ser::Error) -> Self {
         Error::TomlSer(err)
+    }
+}
+
+impl From<str::Utf8Error> for Error {
+    fn from(err : str::Utf8Error) -> Self {
+        Error::Utf8(err)
     }
 }
