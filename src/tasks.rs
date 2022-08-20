@@ -2,12 +2,14 @@ use crate::error;
 use crate::state;
 use crate::colour;
 
+use std::io;
 use std::fs;
+use std::fmt;
 use std::mem;
 use std::path;
-use std::io;
 use std::io::{Write, Seek};
 use std::collections::HashSet;
+use colored::Colorize;
 
 pub type Id = u64;
 
@@ -20,19 +22,42 @@ pub struct Task {
 #[derive(Default, Debug, Clone, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Priority {
     #[default]
-    Unspecified,
     Low,
     Medium,
     High,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+impl fmt::Display for Priority {
+    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Priority::*;
+        let priority = match self {
+            Low => "low",
+            Medium => "medium",
+            High => "high",
+        };
+        write!(f, "{}", priority)
+    }
+}
+
+impl Priority {
+    pub fn coloured(&self) -> String {
+        use Priority::*;
+        let priority = match self {
+            Low => "low".truecolor(46, 204, 113),
+            Medium => "medium".truecolor(241, 196, 15),
+            High => "high".truecolor(231, 76, 60),
+        };
+        format!("{}", priority)
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
     hours : u32,
     minutes : u8,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InternalTask {
     pub id : Id,
     pub name : String,
@@ -152,6 +177,85 @@ impl Task {
         fs::remove_file(&path)?;
         Ok(())
     }
+
+    pub fn display(&self) -> Result<(), error::Error> {
+
+        fn line(len : usize) {
+            for _ in 0..len {
+                print!("-");
+            }
+            println!();
+        }
+
+        let id = &self.data.id.to_string();
+        let heading = format!("[{}] {} {}", if self.data.complete {"X"} else {" "}, colour::id(&id), colour::task_name(&self.data.name));
+        println!("{}", heading);
+        line(5 + self.data.name.len() + id.len());
+        println!("Priority: {}", self.data.priority.coloured());
+        println!("Tags:     [{}]", format_hash_set(&self.data.tags)?);
+        println!("Created:  {}", self.data.created);
+
+        if let Some(info) = &self.data.info {
+            println!("Info:");
+            // Figure out how to indent this properly:
+            println!("\t{}", info);
+        }
+
+        Ok(())
+
+        // dependencies as a tree
+    }
+}
+
+fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error::Error> {
+    let mut output = String::new();
+
+    for value in set.iter() {
+        fmt::write(&mut output, format_args!("{}, ", value))?;
+    }
+
+    if output.len() != 0 {
+        output.pop();
+        output.pop();
+    }
+
+    Ok(output)
+}
+
+pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
+    let ids : Vec<Id> =
+        fs::read_dir(vault_folder.join("notes"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|p| p.is_file())
+        .map(|p| p.file_stem().unwrap().to_str().unwrap().to_string())
+        .filter_map(|n| n.parse::<Id>().ok())
+        .collect();
+
+    let mut table = comfy_table::Table::new();
+
+    table
+        .load_preset(comfy_table::presets::UTF8_FULL)
+        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+
+    table.set_header(vec!["Id", "Name", "Tags", "Priority"]);
+
+    for id in ids {
+        let task = Task::load(id, vault_folder.to_path_buf(), true)?;
+
+        table.add_row(
+            vec![
+                task.data.id.to_string(),
+                task.data.name,
+                format_hash_set(&task.data.tags)?,
+                task.data.priority.to_string()
+            ]
+        );
+    }
+
+    println!("{}", table);
+
+    Ok(())
 }
 
 

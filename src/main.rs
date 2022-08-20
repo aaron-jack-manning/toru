@@ -32,6 +32,10 @@ enum Command {
         #[clap(short, long, value_enum)]
         priority : Option<tasks::Priority>,
     },
+    /// Displays the specified task in detail.
+    View {
+        id : tasks::Id,
+    },
     /// Delete a task completely.
     Delete {
         id : tasks::Id,
@@ -48,6 +52,14 @@ enum Command {
     #[clap(trailing_var_arg=true)]
     Git {
         args : Vec<String>,
+    },
+    /// Lists tasks according to the specified ordering and filters.
+    List {
+        // Need to have options for:
+        // - column to order by
+        // - ascending or descending
+        // - which columns to include
+        // - filters which exclude values
     },
     /// Commands for interacting with vaults.
     #[clap(subcommand)]
@@ -124,7 +136,7 @@ fn program() -> Result<(), error::Error> {
                     println!("Deleted vault {}", colour::vault(&name));
                 },
                 List => {
-                    config.list_vaults();
+                    config.list_vaults()?;
                 },
                 Switch { name } => {
                     config.switch(&name)?;
@@ -144,6 +156,10 @@ fn program() -> Result<(), error::Error> {
                 Delete { id } => {
                     tasks::Task::delete_by_id(id, vault_folder)?;
                     println!("Deleted task {}", colour::id(&id.to_string()));
+                },
+                View { id } => {
+                    let task = tasks::Task::load(id, vault_folder.clone(), true)?;
+                    task.display()?;
                 }
                 Discard { id } => {
                     let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
@@ -160,6 +176,9 @@ fn program() -> Result<(), error::Error> {
                 Git { args } => {
                     git::run_command(args, vault_folder)?;
                 },
+                List {} => {
+                    tasks::list(vault_folder)?;
+                }
                 Vault(_) => unreachable!(),
             }
 

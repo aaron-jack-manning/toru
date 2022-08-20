@@ -64,12 +64,12 @@ impl Config {
     }
 
     /// Lists all vaults to stdout.
-    pub fn list_vaults(&self) {
+    pub fn list_vaults(&self) -> Result<(), error::Error> {
 
         let width = self.vaults.iter().fold(usize::MIN, |c, (n, _)| c.max(n.len()));
 
         if self.vaults.is_empty() {
-            println!("No vaults currently set up, try running: {}", colour::command("toru vault new <NAME> <PATH>"));
+            Err(error::Error::Generic(format!("No vaults currently set up, try running: {}", colour::command("toru vault new <NAME> <PATH>"))))
         }
         else {
             for (i, (name, path)) in self.vaults.iter().enumerate() {
@@ -93,6 +93,8 @@ impl Config {
 
                 println!();
             }
+
+            Ok(())
         }
     }
 }

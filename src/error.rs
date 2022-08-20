@@ -12,6 +12,7 @@ pub enum Error {
     TomlDe(toml::de::Error),
     TomlSer(toml::ser::Error),
     Utf8(str::Utf8Error),
+    Fmt(fmt::Error),
     Generic(String),
 }
 
@@ -24,6 +25,7 @@ impl fmt::Display for Error {
             Error::TomlDe(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::TomlSer(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::Utf8(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
+            Error::Fmt(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::Generic(message) => write!(f, "{}", message),
         }
     }
@@ -64,3 +66,10 @@ impl From<str::Utf8Error> for Error {
         Error::Utf8(err)
     }
 }
+
+impl From<fmt::Error> for Error {
+    fn from(err : fmt::Error) -> Self {
+        Error::Fmt(err)
+    }
+}
+

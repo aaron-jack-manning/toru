@@ -25,7 +25,8 @@ pub fn file(text : &str) -> colored::ColoredString {
     text.truecolor(255, 184, 184).bold()
 }
 
-// Pink
+// Blue
 pub fn id(text : &str) -> colored::ColoredString {
-    text.truecolor(232, 67, 147).bold()
+    text.truecolor(52, 152, 219)
 }
+

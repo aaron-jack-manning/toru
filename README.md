@@ -3,7 +3,6 @@
 A (currently in development) to do app for the command line.
 
 ## Planned Features and Changes:
-- Viewing individual tasks in full (command: `view`)
 - Options for editing additional config
     - `config`
     - `editor` subcommand for setting default text editor
@@ -26,6 +25,3 @@ A (currently in development) to do app for the command line.
     - Error if any circular dependencies are introduced
     - Make sure dependencies written to file are only those that could be successfully created
 - Automatically added recurring notes
-
-## Bugs:
-- Git commands which automatically open a text editor after don't work as expected
