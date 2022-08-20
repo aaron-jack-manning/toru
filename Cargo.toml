@@ -1,0 +1,15 @@
+[package]
+name = "toru"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aaron Manning <contact@aaronmanning.net>"]
+description = "A command line task manager with time tracking."
+
+[dependencies]
+chrono = { version = "0.4.22", features = ["serde"] }
+clap = { version = "3.2.17", features = ["derive"] }
+colored = "2.0.0"
+confy = "0.4.0"
+serde = { version = "1.0.143", features = ["derive"] }
+toml = "0.5.9"
+trash = "2.1.5"
