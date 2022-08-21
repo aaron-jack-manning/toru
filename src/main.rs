@@ -41,6 +41,8 @@ enum Command {
     },
     Edit {
         id : Id,
+        #[clap(long)]
+        info : bool,
     },
     /// Delete a task completely.
     Delete {
@@ -167,8 +169,13 @@ fn program() -> Result<(), error::Error> {
                     let task = tasks::Task::load(id, vault_folder.clone(), true)?;
                     task.display()?;
                 },
-                Edit { id } => {
-                    edit::edit_raw(id, vault_folder.clone())?;
+                Edit { id, info } => {
+                    if info {
+                        edit::edit_info(id, vault_folder.clone(), "nvim")?;
+                    }
+                    else {
+                        edit::edit_raw(id, vault_folder.clone(), "nvim")?;
+                    }
                     println!("Updated task {}", colour::id(&id.to_string()));
                 },
                 Discard { id } => {

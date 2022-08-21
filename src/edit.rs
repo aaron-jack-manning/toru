@@ -7,7 +7,49 @@ use crate::tasks;
 use crate::error;
 use crate::tasks::Id;
 
-pub fn edit_raw(id : Id, vault_folder : path::PathBuf) -> Result<(), error::Error> {
+pub fn open_editor(path : &path::Path, editor : &str) -> Result<process::ExitStatus, error::Error> {
+    let mut command = process::Command::new(editor);
+
+    command 
+        .args(vec![&path]);
+
+    let mut child = command.spawn()?;
+
+    child.wait().map_err(|err| error::Error::from(err))
+}
+
+pub fn edit_info(id : Id, vault_folder : path::PathBuf, editor : &str) -> Result<(), error::Error> {
+    let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
+
+    let temp_path = vault_folder.join("temp.md");
+
+    fs::write(&temp_path, &task.data.info.unwrap_or(String::new()).as_bytes())?;
+
+    let status = open_editor(&temp_path, editor)?;
+
+    if !status.success() {
+        match status.code() {
+            Some(code) => Err(error::Error::Generic(format!("Process responded with a non-zero status code: {}", code))),
+            None => Err(error::Error::Generic(String::from("Process was interrupted by signal"))),
+        }
+    }
+    else {
+        let file_contents = fs::read_to_string(&temp_path)?;
+
+        task.data.info = if file_contents.is_empty() {
+            None
+        }
+        else {
+            Some(file_contents)
+        };
+        
+        task.save()?;
+
+        Ok(())
+    }
+}
+
+pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str) -> Result<(), error::Error> {
 
     let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
 
@@ -15,17 +57,8 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf) -> Result<(), error::Erro
 
     fs::copy(task.path(), &temp_path)?;
 
-    // This will be a matter of configuration later on.
-    let mut command = process::Command::new("nvim");
-
-    command 
-        .current_dir(&vault_folder)
-        .args(vec![&temp_path]);
-
-    let mut child = command.spawn()?;
-
-    let status = child.wait()?;
-
+    let status = open_editor(&temp_path, editor)?;
+    
     if !status.success() {
         match status.code() {
             Some(code) => Err(error::Error::Generic(format!("Process responded with a non-zero status code: {}", code))),
