@@ -1,19 +1,26 @@
+use crate::error;
+use crate::tasks;
+use crate::tasks::Id;
+
 use std::fs;
 use std::path;
 use std::io;
 use std::io::{Write, Seek};
+use std::collections::HashMap;
 
-use crate::error;
-use crate::tasks::Id;
+use serde_with::{serde_as, DisplayFromStr};
 
 pub struct State {
     file : fs::File,
     pub data : InternalState,
 }
 
+#[serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct InternalState {
     pub next_id : Id,
+    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
+    pub index : HashMap<String, Vec<Id>>,
 }
 
 impl State {
@@ -39,8 +46,8 @@ impl State {
         }
         else {
 
+            // Calculating the next ID if necessary.
             let mut max_id : i128 = -1;
-
             for id in vault_location.join("notes").read_dir()?.filter_map(|p| p.ok()).map(|p| p.path()).filter(|p| p.extension().map(|s| s.to_str()) == Some(Some("toml"))).filter_map(|p| p.file_stem().map(|x| x.to_str().map(|y| y.to_string()))).flatten().filter_map(|p| p.parse::<Id>().ok()) {
 
                 if i128::try_from(id).unwrap() > max_id {
@@ -48,8 +55,23 @@ impl State {
                 }
             }
 
+            // Calculating out the index.
+            let tasks = tasks::Task::load_all(vault_location, true)?;
+            let mut index : HashMap<String, Vec<Id>> = HashMap::with_capacity(tasks.len());
+            for task in tasks {
+                match index.get_mut(&task.data.name) {
+                    Some(ids) => {
+                        ids.push(task.data.id);
+                    },
+                    None => {
+                        index.insert(task.data.name.clone(), vec![task.data.id]);
+                    },
+                }
+            }
+
             let data = InternalState {
                 next_id : u64::try_from(max_id + 1).unwrap(),
+                index,
             };
 
             let mut file = fs::File::options()
@@ -82,5 +104,28 @@ impl State {
         file.write_all(toml::to_string(&data)?.as_bytes())?;
 
         Ok(())
+    }
+
+    pub fn index_insert(&mut self, name : String, id : Id) {
+        match self.data.index.get_mut(&name) {
+            Some(ids) => {
+                ids.push(id);
+            },
+            None => {
+                self.data.index.insert(name, vec![id]);
+            }
+        }
+    }
+
+    pub fn index_remove(&mut self, name : String, id : Id) {
+        if let Some(mut ids) = self.data.index.remove(&name) {
+            if let Some(index) = ids.iter().position(|i| i == &id) {
+                ids.swap_remove(index);
+
+                if !ids.is_empty() {
+                    self.data.index.insert(name, ids);
+                }
+            }
+        }
     }
 }

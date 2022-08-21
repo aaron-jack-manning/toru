@@ -11,7 +11,6 @@ A (currently in development) to do app for the command line.
     - Options for which columns to include
     - If no values given, read a set of defaults from a `list.toml` file, which can be edited from a similar command
 - Ability to view, edit, delete, etc. using name
-    - Have a file containing a serialized `HashMap<String, Vec<Id>>`
     - Disallow numerical names and have command automatically identify if it is a name or Id
     - Error on operation if two tasks exist with the same name
 - Dependency tracker

@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+//#![allow(dead_code, unused_variables)]
 
 mod git;
 mod edit;
@@ -164,11 +164,15 @@ fn program() -> Result<(), error::Error> {
                     println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
                 },
                 Delete { id } => {
-                    tasks::Task::delete_by_id(id, vault_folder)?;
-                    println!("Deleted task {}", colour::id(&id.to_string()));
+                    let task = tasks::Task::load(id, vault_folder, false)?;
+                    let name = task.data.name.clone();
+                    state.index_remove(task.data.name.clone(), task.data.id);
+                    task.delete()?;
+
+                    println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
                 },
                 View { id } => {
-                    let task = tasks::Task::load(id, vault_folder.clone(), true)?;
+                    let task = tasks::Task::load(id, vault_folder, true)?;
                     task.display()?;
                 },
                 Edit { id, info } => {
@@ -176,18 +180,18 @@ fn program() -> Result<(), error::Error> {
                         edit::edit_info(id, vault_folder.clone(), "nvim")?;
                     }
                     else {
-                        edit::edit_raw(id, vault_folder.clone(), "nvim")?;
+                        edit::edit_raw(id, vault_folder.clone(), "nvim", &mut state)?;
                     }
                     println!("Updated task {}", colour::id(&id.to_string()));
                 },
                 Discard { id } => {
-                    let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
+                    let mut task = tasks::Task::load(id, vault_folder, false)?;
                     task.data.discarded = true;
                     task.save()?;
                     println!("Discarded task {}", colour::id(&id.to_string()));
                 },
                 Complete { id } => {
-                    let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
+                    let mut task = tasks::Task::load(id, vault_folder, false)?;
                     task.data.complete = true;
                     task.save()?;
                     println!("Marked task {} as complete", colour::id(&id.to_string()));

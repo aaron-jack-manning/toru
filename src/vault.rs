@@ -10,8 +10,7 @@ pub fn new(name : String, path : path::PathBuf, config : &mut config::Config) ->
 
     fn create_all_metadata(path : &path::Path) -> Result<(), error::Error> {
         fs::create_dir(path.join("notes"))?;
-        let state = state::State::load(path)?;
-        //state.save()?;
+        let _ = state::State::load(path)?;
 
         Ok(())
     }

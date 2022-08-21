@@ -75,6 +75,10 @@ pub struct InternalTask {
 impl Task {
     pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
 
+        if name.chars().all(|c| c.is_numeric()) {
+            return Err(error::Error::Generic(String::from("Name must not be purely numeric")));
+        };
+
         let id = state.data.next_id;
         state.data.next_id += 1;
         
@@ -98,10 +102,11 @@ impl Task {
             discarded : false,
         };
 
-
         file.set_len(0)?;
         file.seek(io::SeekFrom::Start(0))?;
         file.write_all(toml::to_string(&data)?.as_bytes())?;
+
+        state.index_insert(data.name.clone(), id);
 
         Ok(Task {
             path,
@@ -136,10 +141,28 @@ impl Task {
 
     /// The read_only flag is so that the file will not be truncated, and therefore doesn't need to
     /// be saved when finished.
-    pub fn load(id : Id, vault_folder : path::PathBuf, read_only : bool) -> Result<Self, error::Error> {
-        let path = Task::check_exists(id, &vault_folder)?;
+    pub fn load(id : Id, vault_folder : &path::Path, read_only : bool) -> Result<Self, error::Error> {
+        let path = Task::check_exists(id, vault_folder)?;
 
         Task::load_direct(path, read_only)
+    }
+
+    pub fn load_all(vault_folder : &path::Path, read_only : bool) -> Result<Vec<Self>, error::Error> {
+        let ids : Vec<Id> =
+            fs::read_dir(vault_folder.join("notes"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|p| p.is_file())
+            .map(|p| p.file_stem().unwrap().to_str().unwrap().to_string())
+            .filter_map(|n| n.parse::<Id>().ok())
+            .collect();
+
+        let mut tasks = Vec::with_capacity(ids.len());
+        for id in ids {
+            tasks.push(Task::load(id, vault_folder, read_only)?);
+        }
+
+        Ok(tasks)
     }
 
     pub fn path(&self) -> &path::Path {
@@ -158,7 +181,7 @@ impl Task {
 
     pub fn save(self) -> Result<(), error::Error> {
         let Self {
-            path,
+            path : _,
             mut file,
             data,
         } = self;
@@ -174,18 +197,12 @@ impl Task {
         let Self {
             path,
             file,
-            data,
+            data : _,
         } = self;
 
         mem::drop(file);
         fs::remove_file(&path)?;
 
-        Ok(())
-    }
-
-    pub fn delete_by_id(id : Id, vault_folder : &path::Path) -> Result<(), error::Error> {
-        let path = Task::check_exists(id, vault_folder)?;
-        fs::remove_file(&path)?;
         Ok(())
     }
 
@@ -200,7 +217,7 @@ impl Task {
 
         let id = &self.data.id.to_string();
         let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
-        let heading = format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(&id), colour::task_name(&self.data.name), colour::greyed_out(&discarded));
+        let heading = format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded));
         println!("{}", heading);
 
         line(5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count());
@@ -212,11 +229,11 @@ impl Task {
             let mut max_line_width = 0;
             println!("Info:");
 
-            while info.ends_with("\n") {
+            while info.ends_with('\n') {
                 info.pop();
             }
 
-            let info_lines : Vec<&str> = info.split("\n").collect();
+            let info_lines : Vec<&str> = info.split('\n').collect();
             for line in info_lines {
                 max_line_width = usize::max(max_line_width, line.chars().count() + 4);
                 println!("    {}", line);
@@ -240,7 +257,8 @@ fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error:
         fmt::write(&mut output, format_args!("{}, ", value))?;
     }
 
-    if output.len() != 0 {
+    // Remove the trailing comma and space.
+    if !output.is_empty() {
         output.pop();
         output.pop();
     }
@@ -249,30 +267,15 @@ fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error:
 }
 
 pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
-    let ids : Vec<Id> =
-        fs::read_dir(vault_folder.join("notes"))
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|p| p.is_file())
-        .map(|p| p.file_stem().unwrap().to_str().unwrap().to_string())
-        .filter_map(|n| n.parse::<Id>().ok())
-        .collect();
 
     let mut table = comfy_table::Table::new();
-
     table
         .load_preset(comfy_table::presets::UTF8_FULL)
         .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-
     table.set_header(vec!["Id", "Name", "Tags", "Priority"]);
 
-    let mut tasks = Vec::with_capacity(ids.len());
-
-    for id in ids {
-        tasks.push(Task::load(id, vault_folder.to_path_buf(), true)?);
-    }
-
+    let mut tasks = Task::load_all(vault_folder, true)?;
     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
 
     for task in tasks {
@@ -282,7 +285,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
                     task.data.id.to_string(),
                     task.data.name,
                     format_hash_set(&task.data.tags)?,
-                    task.data.priority.to_string()
+                    task.data.priority.to_string(),
                 ]
             );
         }
