@@ -39,9 +39,11 @@ enum Command {
     View {
         id : Id,
     },
+    /// Edit a note directly.
     Edit {
         id : Id,
-        #[clap(long)]
+        /// Edit the info specifically in its own file.
+        #[clap(short, long)]
         info : bool,
     },
     /// Delete a task completely.
