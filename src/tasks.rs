@@ -208,17 +208,24 @@ impl Task {
         println!("Tags:     [{}]", format_hash_set(&self.data.tags)?);
         println!("Created:  {}", self.data.created);
 
-        let mut max_line_width = 0;
-        if let Some(info) = &self.data.info {
+        if let Some(mut info) = self.data.info.clone() {
+            let mut max_line_width = 0;
             println!("Info:");
+
+            while info.ends_with("\n") {
+                info.pop();
+            }
+
             let info_lines : Vec<&str> = info.split("\n").collect();
             for line in info_lines {
                 max_line_width = usize::max(max_line_width, line.chars().count() + 4);
                 println!("    {}", line);
             }
+            line(usize::min(max_line_width, usize::try_from(termsize::get().map(|s| s.cols).unwrap_or(0)).unwrap()));
         }
-
-        line(usize::min(max_line_width, usize::try_from(termsize::get().map(|s| s.cols).unwrap_or(0)).unwrap()));
+        else {
+            // Need to work out appropriate line size.
+        }
 
         // dependencies as a tree
         
