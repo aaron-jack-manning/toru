@@ -159,7 +159,7 @@ fn program() -> Result<(), error::Error> {
             match command {
                 New { name, info, tags, dependencies, priority } => {
                     let task = tasks::Task::new(name, info, tags, dependencies, priority, vault_folder, &mut state)?;
-                    println!("Created task {}", colour::task_name(&task.data.name));
+                    println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
                 },
                 Delete { id } => {
                     tasks::Task::delete_by_id(id, vault_folder)?;
