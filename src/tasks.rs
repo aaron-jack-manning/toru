@@ -199,9 +199,11 @@ impl Task {
         }
 
         let id = &self.data.id.to_string();
-        let heading = format!("[{}] {} {}", if self.data.complete {"X"} else {" "}, colour::id(&id), colour::task_name(&self.data.name));
+        let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
+        let heading = format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(&id), colour::task_name(&self.data.name), colour::greyed_out(&discarded));
         println!("{}", heading);
-        line(5 + self.data.name.len() + id.len());
+
+        line(5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count());
         println!("Priority: {}", self.data.priority.coloured());
         println!("Tags:     [{}]", format_hash_set(&self.data.tags)?);
         println!("Created:  {}", self.data.created);

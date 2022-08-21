@@ -30,3 +30,7 @@ pub fn id(text : &str) -> colored::ColoredString {
     text.truecolor(52, 152, 219)
 }
 
+// Grey
+pub fn greyed_out(text : &str) -> colored::ColoredString {
+    text.truecolor(99, 110, 114)
+}
