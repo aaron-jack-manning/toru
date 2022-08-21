@@ -1,5 +1,6 @@
 use crate::error;
 use crate::tasks;
+use crate::colour;
 use crate::tasks::Id;
 
 use std::fs;
@@ -124,6 +125,41 @@ impl State {
 
                 if !ids.is_empty() {
                     self.data.index.insert(name, ids);
+                }
+            }
+        }
+    }
+
+    pub fn name_or_id_to_id(&self, name : &String) -> Result<Id, error::Error> {
+        match name.parse::<Id>() {
+            Ok(id) => Ok(id),
+            Err(_) => {
+                match self.data.index.get(name) {
+                    Some(ids) => {
+                        if ids.len() == 1 {
+                            Ok(ids[0])
+                        }
+                        else {
+                            let coloured_ids : Vec<_> =
+                                ids.into_iter()
+                                .map(|i| colour::id(&i.to_string()))
+                                .collect();
+
+                            let mut display_ids = String::new();
+
+                            for id in coloured_ids {
+                                display_ids.push_str(&format!("{}, ", id));
+                            }
+
+                            if !display_ids.is_empty() {
+                                display_ids.pop();
+                                display_ids.pop();
+                            }
+
+                            Err(error::Error::Generic(format!("Multiple notes (Ids: [{}]) by that name exist", display_ids)))
+                        }
+                    },
+                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::task_name(&name)))),
                 }
             }
         }

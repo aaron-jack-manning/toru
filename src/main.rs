@@ -37,26 +37,26 @@ enum Command {
     },
     /// Displays the specified task in detail.
     View {
-        id : Id,
+        id_or_name : String,
     },
     /// Edit a note directly.
     Edit {
-        id : Id,
+        id_or_name : String,
         /// Edit the info specifically in its own file.
         #[clap(short, long)]
         info : bool,
     },
     /// Delete a task completely.
     Delete {
-        id : Id,
+        id_or_name : String,
     },
     /// Discard a task without deleting the underlying file.
     Discard {
-        id : Id,
+        id_or_name : String,
     },
     /// Mark a task as complete.
     Complete {
-        id : Id,
+        id_or_name : String,
     },
     /// Run Git commands at the root of the vault.
     #[clap(trailing_var_arg=true)]
@@ -163,7 +163,8 @@ fn program() -> Result<(), error::Error> {
                     let task = tasks::Task::new(name, info, tags, dependencies, priority, vault_folder, &mut state)?;
                     println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
                 },
-                Delete { id } => {
+                Delete { id_or_name } => {
+                    let id = state.name_or_id_to_id(&id_or_name)?;
                     let task = tasks::Task::load(id, vault_folder, false)?;
                     let name = task.data.name.clone();
                     state.index_remove(task.data.name.clone(), task.data.id);
@@ -171,11 +172,13 @@ fn program() -> Result<(), error::Error> {
 
                     println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
                 },
-                View { id } => {
+                View { id_or_name } => {
+                    let id = state.name_or_id_to_id(&id_or_name)?;
                     let task = tasks::Task::load(id, vault_folder, true)?;
                     task.display()?;
                 },
-                Edit { id, info } => {
+                Edit { id_or_name, info } => {
+                    let id = state.name_or_id_to_id(&id_or_name)?;
                     if info {
                         edit::edit_info(id, vault_folder.clone(), "nvim")?;
                     }
@@ -184,13 +187,15 @@ fn program() -> Result<(), error::Error> {
                     }
                     println!("Updated task {}", colour::id(&id.to_string()));
                 },
-                Discard { id } => {
+                Discard { id_or_name } => {
+                    let id = state.name_or_id_to_id(&id_or_name)?;
                     let mut task = tasks::Task::load(id, vault_folder, false)?;
                     task.data.discarded = true;
                     task.save()?;
                     println!("Discarded task {}", colour::id(&id.to_string()));
                 },
-                Complete { id } => {
+                Complete { id_or_name } => {
+                    let id = state.name_or_id_to_id(&id_or_name)?;
                     let mut task = tasks::Task::load(id, vault_folder, false)?;
                     task.data.complete = true;
                     task.save()?;
