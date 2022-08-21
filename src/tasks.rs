@@ -19,7 +19,7 @@ pub struct Task {
     pub data : InternalTask,
 }
 
-#[derive(Default, Debug, Clone, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Priority {
     #[default]
     Low,
@@ -266,9 +266,15 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
 
     table.set_header(vec!["Id", "Name", "Tags", "Priority"]);
 
-    for id in ids {
-        let task = Task::load(id, vault_folder.to_path_buf(), true)?;
+    let mut tasks = Vec::with_capacity(ids.len());
 
+    for id in ids {
+        tasks.push(Task::load(id, vault_folder.to_path_buf(), true)?);
+    }
+
+    tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
+
+    for task in tasks {
         if !task.data.discarded && !task.data.complete {
             table.add_row(
                 vec![
