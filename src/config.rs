@@ -4,10 +4,20 @@ use crate::colour;
 
 use std::path;
 
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Config {
     /// Paths for all vaults, ordered according to recent usage, with current at the front.
     pub vaults : Vec<(String, path::PathBuf)>,
+    pub editor : String,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            vaults : Vec::default(),
+            editor : String::from("vim"),
+        }
+    }
 }
 
 impl Config {

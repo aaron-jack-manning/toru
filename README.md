@@ -3,9 +3,6 @@
 A (currently in development) to do app for the command line.
 
 ## Planned Features and Changes:
-- Options for editing additional config
-    - `config`
-    - `editor` subcommand for setting default text editor
 - Listing tasks in vault (command: `list`)
     - Options for which field to order by, and how to order (ascending or descending)
     - Options for which columns to include

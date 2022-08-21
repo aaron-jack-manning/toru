@@ -1,5 +1,3 @@
-//#![allow(dead_code, unused_variables)]
-
 mod git;
 mod edit;
 mod vault;
@@ -71,9 +69,21 @@ enum Command {
         // - which columns to include
         // - filters which exclude values
     },
+    /// For making changes to global configuration.
+    #[clap(subcommand)]
+    Config(ConfigCommand),
     /// Commands for interacting with vaults.
     #[clap(subcommand)]
     Vault(VaultCommand),
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum ConfigCommand {
+    /// For checking or changing default text editor command.
+    Editor {
+        /// Command to launch editor. Omit to view current editor.
+        editor : Option<String>,
+    }
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -153,7 +163,23 @@ fn program() -> Result<(), error::Error> {
                     println!("Switched to vault {}", colour::vault(&name));
                 },
             }
-        }
+        },
+        Config(command) => {
+            use ConfigCommand::*;
+            match command {
+                Editor { editor } => {
+                    match editor {
+                        Some(editor) => {
+                            config.editor = editor;
+                            println!("Updated editor command to: {}", config.editor);
+                        },
+                        None => {
+                            println!("Current editor command: {}", config.editor);
+                        }
+                    }
+                }
+            }
+        },
         command => {
             let vault_folder = &config.current_vault()?.1;
             let mut state = state::State::load(vault_folder)?;
@@ -180,10 +206,10 @@ fn program() -> Result<(), error::Error> {
                 Edit { id_or_name, info } => {
                     let id = state.name_or_id_to_id(&id_or_name)?;
                     if info {
-                        edit::edit_info(id, vault_folder.clone(), "nvim")?;
+                        edit::edit_info(id, vault_folder.clone(), &config.editor)?;
                     }
                     else {
-                        edit::edit_raw(id, vault_folder.clone(), "nvim", &mut state)?;
+                        edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
                     }
                     println!("Updated task {}", colour::id(&id.to_string()));
                 },
@@ -207,7 +233,7 @@ fn program() -> Result<(), error::Error> {
                 List {} => {
                     tasks::list(vault_folder)?;
                 }
-                Vault(_) => unreachable!(),
+                Vault(_) | Config(_) => unreachable!(),
             }
 
             state.save()?;
