@@ -110,12 +110,11 @@ impl Task {
         })
     }
 
-    /// The read_only flag is so that the file will not be truncated, and therefore doesn't need to
-    /// be saved when finished.
-    pub fn load(id : Id, vault_folder : path::PathBuf, read_only : bool) -> Result<Self, error::Error> {
-        let path = Task::check_exists(id, &vault_folder)?;
-
+    /// Less graceful error handling on this for task not existing. Only use this externally when
+    /// in edit mode.
+    pub fn load_direct(path : path::PathBuf, read_only : bool) -> Result<Self, error::Error> {
         let file_contents = fs::read_to_string(&path)?;
+
         let file = if read_only {
             fs::File::open(&path)?
         }
@@ -133,6 +132,18 @@ impl Task {
             file,
             data,
         })
+    }
+
+    /// The read_only flag is so that the file will not be truncated, and therefore doesn't need to
+    /// be saved when finished.
+    pub fn load(id : Id, vault_folder : path::PathBuf, read_only : bool) -> Result<Self, error::Error> {
+        let path = Task::check_exists(id, &vault_folder)?;
+
+        Task::load_direct(path, read_only)
+    }
+
+    pub fn path(&self) -> &path::Path {
+        &self.path
     }
 
     pub fn check_exists(id : Id, vault_folder : &path::Path) -> Result<path::PathBuf, error::Error> {
@@ -243,14 +254,16 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     for id in ids {
         let task = Task::load(id, vault_folder.to_path_buf(), true)?;
 
-        table.add_row(
-            vec![
-                task.data.id.to_string(),
-                task.data.name,
-                format_hash_set(&task.data.tags)?,
-                task.data.priority.to_string()
-            ]
-        );
+        if !task.data.discarded && !task.data.complete {
+            table.add_row(
+                vec![
+                    task.data.id.to_string(),
+                    task.data.name,
+                    format_hash_set(&task.data.tags)?,
+                    task.data.priority.to_string()
+                ]
+            );
+        }
     }
 
     println!("{}", table);

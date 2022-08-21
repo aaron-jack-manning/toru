@@ -1,12 +1,15 @@
 #![allow(dead_code, unused_variables)]
 
 mod git;
+mod edit;
 mod vault;
 mod error;
 mod tasks;
 mod state;
 mod config;
 mod colour;
+
+use tasks::Id;
 
 use std::path;
 
@@ -28,25 +31,28 @@ enum Command {
         #[clap(short, long)]
         tags : Vec<String>,
         #[clap(short, long)]
-        dependencies : Vec<tasks::Id>,
+        dependencies : Vec<Id>,
         #[clap(short, long, value_enum)]
         priority : Option<tasks::Priority>,
     },
     /// Displays the specified task in detail.
     View {
-        id : tasks::Id,
+        id : Id,
+    },
+    Edit {
+        id : Id,
     },
     /// Delete a task completely.
     Delete {
-        id : tasks::Id,
+        id : Id,
     },
     /// Discard a task without deleting the underlying file.
     Discard {
-        id : tasks::Id,
+        id : Id,
     },
     /// Mark a task as complete.
     Complete {
-        id : tasks::Id,
+        id : Id,
     },
     /// Run Git commands at the root of the vault.
     #[clap(trailing_var_arg=true)]
@@ -160,7 +166,11 @@ fn program() -> Result<(), error::Error> {
                 View { id } => {
                     let task = tasks::Task::load(id, vault_folder.clone(), true)?;
                     task.display()?;
-                }
+                },
+                Edit { id } => {
+                    edit::edit_raw(id, vault_folder.clone())?;
+                    println!("Updated task {}", colour::id(&id.to_string()));
+                },
                 Discard { id } => {
                     let mut task = tasks::Task::load(id, vault_folder.clone(), false)?;
                     task.data.discarded = true;
