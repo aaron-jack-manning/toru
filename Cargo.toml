@@ -3,7 +3,9 @@ name = "toru"
 version = "0.1.0"
 edition = "2021"
 authors = ["Aaron Manning <contact@aaronmanning.net>"]
-description = "A command line task manager with time tracking."
+license = "GPL-2.0-only"
+description = "A command line task manager."
+repository = "https://github.com/aaron-jack-manning/toru"
 
 [dependencies]
 chrono = { version = "0.4.22", features = ["serde"] }
