@@ -59,6 +59,22 @@ pub struct TimeEntry {
 }
 
 impl TimeEntry {
+    /// Adds up a collection of time entries.
+    fn total(entries : &Vec<TimeEntry>) -> (u16, u16) {
+        let (hours, minutes) =
+            entries
+            .into_iter()
+            .fold((0, 0), |a, e| (a.0 + e.hours, a.1 + e.minutes));
+
+        let (hours, minutes) = {
+            (hours + minutes / 60, minutes % 60)
+        };
+
+        (hours, minutes)
+    }
+}
+
+impl TimeEntry {
     pub fn new(hours : u16, minutes : u16) -> Self {
 
         let (hours, minutes) = {
@@ -308,19 +324,23 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
         .load_preset(comfy_table::presets::UTF8_FULL)
         .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-    table.set_header(vec!["Id", "Name", "Tags", "Priority"]);
+    table.set_header(vec!["Id", "Name", "Tags", "Priority", "Time"]);
 
     let mut tasks = Task::load_all(vault_folder, true)?;
     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
 
     for task in tasks {
         if !task.data.discarded && !task.data.complete {
+
+            let (hours, minutes) = TimeEntry::total(&task.data.time_entries);
+
             table.add_row(
                 vec![
                     task.data.id.to_string(),
                     task.data.name,
                     format_hash_set(&task.data.tags)?,
                     task.data.priority.to_string(),
+                    if (hours, minutes) == (0, 0) { String::new() } else { format!("{}:{:0>2}", hours, minutes) },
                 ]
             );
         }

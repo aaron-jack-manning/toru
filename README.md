@@ -38,8 +38,6 @@ Run `--help` alongside any command to get details on what it does.
     - List dependencies as a tree on note view below info
 - Automatically added recurring notes system
 - Time tracking
-    - `track` command to track time on a note
-    - Include time entries and totals on note view
     - Command to give statistics on time tracking (by tag, and for the last x days)
 - Due dates
     - Taken as input when creating notes
