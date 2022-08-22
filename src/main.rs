@@ -17,7 +17,7 @@ struct Args {
     command : Command,
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug, PartialEq, Eq)]
 #[clap(version, about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
 enum Command {
     /// Create a new task.
@@ -61,6 +61,9 @@ enum Command {
     Git {
         args : Vec<String>,
     },
+    /// Adds the recommended .gitignore file to the vault.
+    #[clap(name="gitignore")]
+    GitIgnore,
     /// Lists tasks according to the specified ordering and filters.
     List {
         // Need to have options for:
@@ -81,7 +84,7 @@ enum Command {
     },
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug, PartialEq, Eq)]
 enum ConfigCommand {
     /// For checking or changing default text editor command.
     Editor {
@@ -90,7 +93,7 @@ enum ConfigCommand {
     }
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug, PartialEq, Eq)]
 enum VaultCommand {
     /// Creates a new vault at the specified location of the given name.
     New {
@@ -183,6 +186,11 @@ fn program() -> Result<(), error::Error> {
         let vault_folder = &config.current_vault()?.1;
         git::run_command(args, vault_folder)?;
     }
+    else if command == GitIgnore {
+        let vault_folder = &config.current_vault()?.1;
+        git::create_gitignore(vault_folder)?;
+        println!("Default .gitignore file created");
+    }
     // Commands that require loading in the state.
     else {
         let vault_folder = &config.current_vault()?.1;
@@ -235,7 +243,7 @@ fn program() -> Result<(), error::Error> {
                 tasks::list(vault_folder)?;
             },
             // All commands which are dealt with in if let chain at start.
-            Vault(_) | Config(_) | Git { args : _ } | Switch { name : _ } => unreachable!(),
+            Vault(_) | Config(_) | Git { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
         }
 
         state.save()?;

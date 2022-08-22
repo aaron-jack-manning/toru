@@ -1,5 +1,6 @@
 use crate::error;
 
+use std::fs;
 use std::path;
 use std::process;
 
@@ -19,4 +20,8 @@ pub fn run_command(args : Vec<String>, vault_folder : &path::Path) -> Result<(),
     let _ = child.wait()?;
 
     Ok(())
+}
+
+pub fn create_gitignore(vault_folder : &path::Path) -> Result<(), error::Error> {
+    Ok(fs::write(vault_folder.join(".gitignore"), "state.toml\ntemp.toml\ntemp.md")?)
 }
