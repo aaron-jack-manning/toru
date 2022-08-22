@@ -44,4 +44,3 @@ Run `--help` alongside any command to get details on what it does.
 - Due dates
     - Taken as input when creating notes
     - Displayed in list view by default (with number of days remaining)
-- `clean` command to delete discarded tasks

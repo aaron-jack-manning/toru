@@ -296,4 +296,17 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     Ok(())
 }
 
+pub fn clean(vault_folder : &path::Path) -> Result<(), error::Error> {
+
+    let tasks = Task::load_all(vault_folder, false)?;
+
+    for task in tasks {
+        if task.data.discarded {
+            task.delete()?;
+        }
+    }
+
+    Ok(())
+}
+
 

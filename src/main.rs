@@ -48,6 +48,8 @@ enum Command {
     Delete {
         id_or_name : String,
     },
+    /// Deletes all discarded tasks.
+    Clean,
     /// Discard a task without deleting the underlying file.
     Discard {
         id_or_name : String,
@@ -242,6 +244,10 @@ fn program() -> Result<(), error::Error> {
             List {} => {
                 tasks::list(vault_folder)?;
             },
+            Clean => {
+                tasks::clean(vault_folder)?;
+                println!("Deleted all discarded tasks");
+            }
             // All commands which are dealt with in if let chain at start.
             Vault(_) | Config(_) | Git { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
         }
