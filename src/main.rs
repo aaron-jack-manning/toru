@@ -75,6 +75,10 @@ enum Command {
     /// Commands for interacting with vaults.
     #[clap(subcommand)]
     Vault(VaultCommand),
+    /// Switches to the specified vault.
+    Switch {
+        name : String,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -108,10 +112,6 @@ enum VaultCommand {
     },
     /// Lists all configured vaults.
     List,
-    /// Switches to the specified vault.
-    Switch {
-        name : String,
-    },
 }
 
 fn main() {
@@ -135,109 +135,110 @@ fn program() -> Result<(), error::Error> {
     let mut config = config::Config::load()?;
 
     use Command::*;
-    match command {
-        Vault(command) => {
-            use VaultCommand::*;
-            match command {
-                New { name, path } => {
-                    vault::new(name.clone(), path, &mut config)?;
-                    println!("Created vault {}", colour::vault(&name));
-                },
-                Disconnect { name } => {
-                    vault::disconnect(&name, &mut config)?;
-                    println!("Disconnected vault {}", colour::vault(&name));
-                },
-                Connect { name , path } => {
-                    vault::connect(name.clone(), path, &mut config)?;
-                    println!("Connected vault {}", colour::vault(&name));
-                },
-                Delete { name } => {
-                    vault::delete(&name, &mut config)?;
-                    println!("Deleted vault {}", colour::vault(&name));
-                },
-                List => {
-                    config.list_vaults()?;
-                },
-                Switch { name } => {
-                    config.switch(&name)?;
-                    println!("Switched to vault {}", colour::vault(&name));
-                },
-            }
-        },
-        Config(command) => {
-            use ConfigCommand::*;
-            match command {
-                Editor { editor } => {
-                    match editor {
-                        Some(editor) => {
-                            config.editor = editor;
-                            println!("Updated editor command to: {}", config.editor);
-                        },
-                        None => {
-                            println!("Current editor command: {}", config.editor);
-                        }
-                    }
-                }
-            }
-        },
-        command => {
-            let vault_folder = &config.current_vault()?.1;
-            let mut state = state::State::load(vault_folder)?;
-
-            match command {
-                New { name, info, tags, dependencies, priority } => {
-                    let task = tasks::Task::new(name, info, tags, dependencies, priority, vault_folder, &mut state)?;
-                    println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
-                },
-                Delete { id_or_name } => {
-                    let id = state.name_or_id_to_id(&id_or_name)?;
-                    let task = tasks::Task::load(id, vault_folder, false)?;
-                    let name = task.data.name.clone();
-                    state.index_remove(task.data.name.clone(), task.data.id);
-                    task.delete()?;
-
-                    println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
-                },
-                View { id_or_name } => {
-                    let id = state.name_or_id_to_id(&id_or_name)?;
-                    let task = tasks::Task::load(id, vault_folder, true)?;
-                    task.display()?;
-                },
-                Edit { id_or_name, info } => {
-                    let id = state.name_or_id_to_id(&id_or_name)?;
-                    if info {
-                        edit::edit_info(id, vault_folder.clone(), &config.editor)?;
-                    }
-                    else {
-                        edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
-                    }
-                    println!("Updated task {}", colour::id(&id.to_string()));
-                },
-                Discard { id_or_name } => {
-                    let id = state.name_or_id_to_id(&id_or_name)?;
-                    let mut task = tasks::Task::load(id, vault_folder, false)?;
-                    task.data.discarded = true;
-                    task.save()?;
-                    println!("Discarded task {}", colour::id(&id.to_string()));
-                },
-                Complete { id_or_name } => {
-                    let id = state.name_or_id_to_id(&id_or_name)?;
-                    let mut task = tasks::Task::load(id, vault_folder, false)?;
-                    task.data.complete = true;
-                    task.save()?;
-                    println!("Marked task {} as complete", colour::id(&id.to_string()));
-                },
-                Git { args } => {
-                    git::run_command(args, vault_folder)?;
-                },
-                List {} => {
-                    tasks::list(vault_folder)?;
-                }
-                Vault(_) | Config(_) => unreachable!(),
-            }
-
-            state.save()?;
+    if let Vault(command) = command {
+        use VaultCommand::*;
+        match command {
+            New { name, path } => {
+                vault::new(name.clone(), path, &mut config)?;
+                println!("Created vault {}", colour::vault(&name));
+            },
+            Disconnect { name } => {
+                vault::disconnect(&name, &mut config)?;
+                println!("Disconnected vault {}", colour::vault(&name));
+            },
+            Connect { name , path } => {
+                vault::connect(name.clone(), path, &mut config)?;
+                println!("Connected vault {}", colour::vault(&name));
+            },
+            Delete { name } => {
+                vault::delete(&name, &mut config)?;
+                println!("Deleted vault {}", colour::vault(&name));
+            },
+            List => {
+                config.list_vaults()?;
+            },
         }
+    }
+    else if let Config(command) = command {
+        use ConfigCommand::*;
+        match command {
+            Editor { editor } => {
+                match editor {
+                    Some(editor) => {
+                        config.editor = editor;
+                        println!("Updated editor command to: {}", config.editor);
+                    },
+                    None => {
+                        println!("Current editor command: {}", config.editor);
+                    }
+                }
+            }
+        }
+    }
+    else if let Switch { name } = command {
+        config.switch(&name)?;
+        println!("Switched to vault {}", colour::vault(&name));
+    }
+    else if let Git { args } = command {
+        let vault_folder = &config.current_vault()?.1;
+        git::run_command(args, vault_folder)?;
+    }
+    // Commands that require loading in the state.
+    else {
+        let vault_folder = &config.current_vault()?.1;
+        let mut state = state::State::load(vault_folder)?;
+
+        match command {
+            New { name, info, tags, dependencies, priority } => {
+                let task = tasks::Task::new(name, info, tags, dependencies, priority, vault_folder, &mut state)?;
+                println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
+            },
+            Delete { id_or_name } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                let task = tasks::Task::load(id, vault_folder, false)?;
+                let name = task.data.name.clone();
+                state.index_remove(task.data.name.clone(), task.data.id);
+                task.delete()?;
+
+                println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
+            },
+            View { id_or_name } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                let task = tasks::Task::load(id, vault_folder, true)?;
+                task.display()?;
+            },
+            Edit { id_or_name, info } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                if info {
+                    edit::edit_info(id, vault_folder.clone(), &config.editor)?;
+                }
+                else {
+                    edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
+                }
+                println!("Updated task {}", colour::id(&id.to_string()));
+            },
+            Discard { id_or_name } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                let mut task = tasks::Task::load(id, vault_folder, false)?;
+                task.data.discarded = true;
+                task.save()?;
+                println!("Discarded task {}", colour::id(&id.to_string()));
+            },
+            Complete { id_or_name } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                let mut task = tasks::Task::load(id, vault_folder, false)?;
+                task.data.complete = true;
+                task.save()?;
+                println!("Marked task {} as complete", colour::id(&id.to_string()));
+            },
+            List {} => {
+                tasks::list(vault_folder)?;
+            },
+            // All commands which are dealt with in if let chain at start.
+            Vault(_) | Config(_) | Git { args : _ } | Switch { name : _ } => unreachable!(),
+        }
+
+        state.save()?;
     }
 
     config.save()?;
