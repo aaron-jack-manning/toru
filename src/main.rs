@@ -18,7 +18,7 @@ struct Args {
 }
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]
-#[clap(version, about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
+#[clap(version, help_short='H', about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
 enum Command {
     /// Create a new task.
     New {
@@ -73,6 +73,14 @@ enum Command {
         // - ascending or descending
         // - which columns to include
         // - filters which exclude values
+    },
+    /// For tracking time against a note.
+    Track {
+        id_or_name : String,
+        #[clap(short, default_value_t=0)]
+        hours : u16,
+        #[clap(short, default_value_t=0)]
+        minutes : u16,
     },
     /// For making changes to global configuration.
     #[clap(subcommand)]
@@ -226,6 +234,13 @@ fn program() -> Result<(), error::Error> {
                     edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
                 }
                 println!("Updated task {}", colour::id(&id.to_string()));
+            },
+            Track { id_or_name, hours, minutes } => {
+                let id = state.name_or_id_to_id(&id_or_name)?;
+                let mut task = tasks::Task::load(id, vault_folder, false)?;
+                let entry =  tasks::TimeEntry::new(hours, minutes);
+                task.data.time_entries.push(entry);
+                task.save()?;
             },
             Discard { id_or_name } => {
                 let id = state.name_or_id_to_id(&id_or_name)?;

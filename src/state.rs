@@ -80,9 +80,11 @@ impl State {
                 .create(true)
                 .open(&path)?;
 
+            let file_contents = toml::to_string(&data)?;
+
             file.set_len(0)?;
             file.seek(io::SeekFrom::Start(0))?;
-            file.write_all(toml::to_string(&data)?.as_bytes())?;
+            file.write_all(file_contents.as_bytes())?;
 
             let task = Self {
                 file,
@@ -100,9 +102,11 @@ impl State {
             data,
         } = self; 
 
+        let file_contents = toml::to_string(&data)?;
+
         file.set_len(0)?;
         file.seek(io::SeekFrom::Start(0))?;
-        file.write_all(toml::to_string(&data)?.as_bytes())?;
+        file.write_all(file_contents.as_bytes())?;
 
         Ok(())
     }

@@ -51,10 +51,26 @@ impl Priority {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
-    hours : u32,
-    minutes : u8,
+    logged_date : chrono::NaiveDate,
+    hours : u16,
+    minutes : u16,
+}
+
+impl TimeEntry {
+    pub fn new(hours : u16, minutes : u16) -> Self {
+
+        let (hours, minutes) = {
+            (hours + minutes / 60, minutes % 60)
+        };
+
+        Self {
+            logged_date : chrono::Utc::now().naive_local().date(),
+            hours,
+            minutes,
+        }
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -66,10 +82,10 @@ pub struct InternalTask {
     pub dependencies : HashSet<Id>,
     pub priority : Priority,
     //due : Option<chrono::NaiveDateTime>,
-    pub time_entries : Vec<TimeEntry>,
     pub created : chrono::NaiveDateTime,
     pub complete : bool,
     pub discarded : bool,
+    pub time_entries : Vec<TimeEntry>,
 }
 
 impl Task {
@@ -102,9 +118,11 @@ impl Task {
             discarded : false,
         };
 
+        let file_contents = toml::to_string(&data)?;
+
         file.set_len(0)?;
         file.seek(io::SeekFrom::Start(0))?;
-        file.write_all(toml::to_string(&data)?.as_bytes())?;
+        file.write_all(file_contents.as_bytes())?;
 
         state.index_insert(data.name.clone(), id);
 
@@ -186,9 +204,11 @@ impl Task {
             data,
         } = self;
 
+        let file_contents = toml::to_string(&data)?;
+
         file.set_len(0)?;
         file.seek(io::SeekFrom::Start(0))?;
-        file.write_all(toml::to_string(&data)?.as_bytes())?;
+        file.write_all(file_contents.as_bytes())?;
 
         Ok(())
     }
@@ -207,7 +227,7 @@ impl Task {
     }
 
     pub fn display(&self) -> Result<(), error::Error> {
-
+        
         fn line(len : usize) {
             for _ in 0..len {
                 print!("-");
@@ -215,15 +235,22 @@ impl Task {
             println!();
         }
 
-        let id = &self.data.id.to_string();
-        let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
-        let heading = format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded));
-        println!("{}", heading);
+        let (heading, heading_length) = {
+            let id = &self.data.id.to_string();
+            let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
 
-        line(5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count());
-        println!("Priority: {}", self.data.priority.coloured());
-        println!("Tags:     [{}]", format_hash_set(&self.data.tags)?);
-        println!("Created:  {}", self.data.created);
+            (
+                format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded)),
+                5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count()
+            )
+        };
+
+        println!("{}", heading);
+        line(heading_length);
+
+        println!("Priority:     {}", self.data.priority.coloured());
+        println!("Tags:         [{}]", format_hash_set(&self.data.tags)?);
+        println!("Created:      {}", self.data.created);
 
         if let Some(mut info) = self.data.info.clone() {
             let mut max_line_width = 0;
@@ -238,10 +265,18 @@ impl Task {
                 max_line_width = usize::max(max_line_width, line.chars().count() + 4);
                 println!("    {}", line);
             }
-            line(usize::min(max_line_width, usize::try_from(termsize::get().map(|s| s.cols).unwrap_or(0)).unwrap()));
         }
-        else {
-            // Need to work out appropriate line size.
+
+        if !self.data.time_entries.is_empty() {
+
+            let mut entries = self.data.time_entries.clone();
+            // Sort entries by date.
+            entries.sort_by(|e1, e2| e1.logged_date.cmp(&e2.logged_date));
+
+            println!("Time Entries:");
+            for entry in &entries {
+                println!("    {}:{:0>2} [{}]", entry.hours, entry.minutes, entry.logged_date);
+            }
         }
 
         // dependencies as a tree
