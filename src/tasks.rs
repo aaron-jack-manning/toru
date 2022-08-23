@@ -5,6 +5,7 @@ use crate::colour;
 use std::io;
 use std::fs;
 use std::fmt;
+use std::ops;
 use std::mem;
 use std::path;
 use std::io::{Write, Seek};
@@ -53,41 +54,17 @@ impl Priority {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
-    logged_date : chrono::NaiveDate,
+    pub logged_date : chrono::NaiveDate,
+    pub duration : Duration,
+}
+
+// Needs to preserve representation invariant of minutes < 60
+#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Duration {
     hours : u16,
     minutes : u16,
 }
 
-impl TimeEntry {
-    /// Adds up a collection of time entries.
-    fn total(entries : &Vec<TimeEntry>) -> (u16, u16) {
-        let (hours, minutes) =
-            entries
-            .into_iter()
-            .fold((0, 0), |a, e| (a.0 + e.hours, a.1 + e.minutes));
-
-        let (hours, minutes) = {
-            (hours + minutes / 60, minutes % 60)
-        };
-
-        (hours, minutes)
-    }
-}
-
-impl TimeEntry {
-    pub fn new(hours : u16, minutes : u16) -> Self {
-
-        let (hours, minutes) = {
-            (hours + minutes / 60, minutes % 60)
-        };
-
-        Self {
-            logged_date : chrono::Utc::now().naive_local().date(),
-            hours,
-            minutes,
-        }
-    }
-}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InternalTask {
@@ -291,7 +268,7 @@ impl Task {
 
             println!("Time Entries:");
             for entry in &entries {
-                println!("    {}:{:0>2} [{}]", entry.hours, entry.minutes, entry.logged_date);
+                println!("    {} [{}]", entry.duration, entry.logged_date);
             }
         }
 
@@ -332,7 +309,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     for task in tasks {
         if !task.data.discarded && !task.data.complete {
 
-            let (hours, minutes) = TimeEntry::total(&task.data.time_entries);
+            let duration = TimeEntry::total(&task.data.time_entries);
 
             table.add_row(
                 vec![
@@ -340,7 +317,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
                     task.data.name,
                     format_hash_set(&task.data.tags)?,
                     task.data.priority.to_string(),
-                    if (hours, minutes) == (0, 0) { String::new() } else { format!("{}:{:0>2}", hours, minutes) },
+                    if duration == Duration::zero() { String::new() } else { duration.to_string() },
                 ]
             );
         }
@@ -362,6 +339,76 @@ pub fn clean(vault_folder : &path::Path) -> Result<(), error::Error> {
     }
 
     Ok(())
+}
+
+impl ops::Add for Duration {
+    type Output = Self;
+
+    fn add(self, other : Self) -> Self::Output {
+
+        Self {
+            hours : self.hours + other.hours + (self.minutes + other.minutes) / 60,
+            minutes : (self.minutes + other.minutes) % 60,
+        }
+    }
+}
+
+impl Duration {
+    pub fn zero() -> Self {
+        Self {
+            minutes : 0,
+            hours : 0,
+        }
+    }
+}
+
+
+impl ops::Div<usize> for Duration {
+    type Output = Self;
+
+    fn div(self, divisor : usize) -> Self::Output {
+        let total_mins = f64::from(self.hours * 60 + self.minutes);
+        let divided_mins = total_mins / divisor as f64;
+        let divided_mins = divided_mins.round() as u16;
+
+        Self {
+            hours : divided_mins / 60,
+            minutes : divided_mins % 60,
+        }
+    }
+}
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{:0>2}", self.hours, self.minutes)
+    }
+}
+
+impl TimeEntry {
+    /// Adds up the times from a collection of time entries.
+    fn total(entries : &Vec<TimeEntry>) -> Duration {
+        entries
+        .into_iter()
+        .map(|e| e.duration)
+        .fold(Duration::zero(), |a, d| a + d)
+    }
+}
+
+impl TimeEntry {
+    pub fn new(hours : u16, minutes : u16) -> Self {
+
+        let (hours, minutes) = {
+            (hours + minutes / 60, minutes % 60)
+        };
+
+        Self {
+            logged_date : chrono::Utc::now().naive_local().date(),
+            duration : Duration {
+                hours,
+                minutes,
+            }
+        }
+    }
 }
 
 

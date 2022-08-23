@@ -4,6 +4,7 @@ mod vault;
 mod error;
 mod tasks;
 mod state;
+mod stats;
 mod config;
 mod colour;
 
@@ -82,6 +83,9 @@ enum Command {
         #[clap(short, default_value_t=0)]
         minutes : u16,
     },
+    /// For statistics about the state of your vault.
+    #[clap(subcommand)]
+    Stats(StatsCommand),
     /// For making changes to global configuration.
     #[clap(subcommand)]
     Config(ConfigCommand),
@@ -91,6 +95,15 @@ enum Command {
     /// Switches to the specified vault.
     Switch {
         name : String,
+    },
+}
+
+
+#[derive(clap::Subcommand, Debug, PartialEq, Eq)]
+enum StatsCommand {
+    Tracked {
+        #[clap(short, long, default_value_t=7)]
+        days : u16,
     },
 }
 
@@ -250,6 +263,14 @@ fn program() -> Result<(), error::Error> {
                 let entry =  tasks::TimeEntry::new(hours, minutes);
                 task.data.time_entries.push(entry);
                 task.save()?;
+            },
+            Stats(command) => {
+                use StatsCommand::*;
+                match command {
+                    Tracked { days } => {
+                        stats::time_per_tag(days, vault_folder)?;
+                    }
+                }
             },
             Discard { id_or_name } => {
                 let id = state.name_or_id_to_id(&id_or_name)?;
