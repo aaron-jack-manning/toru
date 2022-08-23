@@ -41,6 +41,32 @@ impl Config {
         self.vaults.iter().any(|(_, p)| p == path)
     }
 
+    pub fn rename_vault(&mut self, old_name : &String, new_name : String) -> Result<(), error::Error> {
+        let mut to_change = None;
+
+        for (name, _) in &mut self.vaults {
+            if *name == new_name {
+                return Err(error::Error::Generic(format!("A vault named {} already exists", colour::vault(&new_name))));
+            }
+
+            if name == old_name {
+                to_change = Some(name);
+            }
+        }
+
+        match to_change {
+            Some(name) => {
+                *name = new_name;
+                Ok(())
+            },
+            None => {
+                Err(error::Error::Generic(format!("No vault named {} exists", colour::vault(&old_name))))
+            }
+        }
+
+
+    }
+
     /// Adds the vault to the configuration.
     pub fn add(&mut self, name : String, path : path::PathBuf) {
         debug_assert!(!self.contains_name(&name));

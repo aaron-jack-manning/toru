@@ -125,6 +125,11 @@ enum VaultCommand {
     },
     /// Lists all configured vaults.
     List,
+    /// For renaming an already set up vault.
+    Rename {
+        old_name : String,
+        new_name : String,
+    }
 }
 
 fn main() {
@@ -170,6 +175,10 @@ fn program() -> Result<(), error::Error> {
             List => {
                 config.list_vaults()?;
             },
+            Rename { old_name, new_name } => {
+                config.rename_vault(&old_name, new_name.clone())?;
+                println!("Renamed vault {} to {}", colour::vault(&old_name), colour::vault(&new_name));
+            }
         }
     }
     else if let Config(command) = command {
