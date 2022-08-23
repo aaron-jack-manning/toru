@@ -93,7 +93,6 @@ impl TimeEntry {
 pub struct InternalTask {
     pub id : Id,
     pub name : String,
-    pub info : Option<String>,
     pub tags : HashSet<String>,
     pub dependencies : HashSet<Id>,
     pub priority : Priority,
@@ -101,6 +100,7 @@ pub struct InternalTask {
     pub created : chrono::NaiveDateTime,
     pub complete : bool,
     pub discarded : bool,
+    pub info : Option<String>,
     pub time_entries : Vec<TimeEntry>,
 }
 
