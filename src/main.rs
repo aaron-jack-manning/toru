@@ -109,7 +109,13 @@ enum Command {
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]
 enum StatsCommand {
+    /// View time tracked per tag recently.
     Tracked {
+        #[clap(short, long, default_value_t=7)]
+        days : u16,
+    },
+    /// View recently completed tasks.
+    Completed {
         #[clap(short, long, default_value_t=7)]
         days : u16,
     },
@@ -281,6 +287,9 @@ fn program() -> Result<(), error::Error> {
                 match command {
                     Tracked { days } => {
                         stats::time_per_tag(days, vault_folder)?;
+                    },
+                    Completed { days } => {
+                        stats::completed_tasks(days, vault_folder)?;
                     }
                 }
             },

@@ -3,6 +3,34 @@ use crate::error;
 
 use std::path;
 use std::collections::BTreeMap;
+use chrono::SubsecRound;
+
+pub fn completed_tasks(days : u16, vault_folder : &path::Path) -> Result<(), error::Error> {
+    let tasks = tasks::Task::load_all(vault_folder, true)?;
+    
+    let mut table = comfy_table::Table::new();
+    table
+        .load_preset(comfy_table::presets::UTF8_FULL)
+        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+        .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
+    table.set_header(vec!["Task", "Completed"]);
+
+    for task in tasks {
+        if let Some(completed_date) = task.data.completed {
+            let time_diff = chrono::Local::now().naive_local() - completed_date;
+            if time_diff < chrono::Duration::days(i64::from(days)) && time_diff > chrono::Duration::zero() {
+                table.add_row(vec![
+                    task.data.name.clone(),
+                    completed_date.round_subsecs(0).to_string()
+                ]);
+            }
+        }
+    }
+
+    println!("{}", table);
+
+    Ok(())
+}
 
 pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error::Error> {
 

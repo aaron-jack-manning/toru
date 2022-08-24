@@ -95,7 +95,6 @@ Then you can run `toru new` to create your first task.
     - Error if any circular dependencies are introduced
     - Make sure dependencies written to file are only those that could be successfully created
     - List dependencies as a tree on note view below info
-- Statistics
-    - Completed tasks over last x days
-    - Improve formatting to terminal to make easier to read for `tracked` command
 - Automatically added recurring notes system
+- Visual changes
+    - All tabled, listed commands need to have cleaner and clearer output, more consistent with viewing individual tasks
