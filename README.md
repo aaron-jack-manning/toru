@@ -2,9 +2,13 @@
 
 A (currently in development) to do app for the command line.
 
+---
+
 ## Current Project Status
 
 This program is at the state where I am regularly using it, and it definately is workable. That said, it does not include all of the core features required to make it an adequate alternative to people who have a to-do system they like, and as such I am regularly making breaking changes. I don't recommend it if you want a stable to do system (yet, although I will update this message when that's no longer true) but if you like some of the ideas here and want to try it out, feedback is welcomed.
+
+---
 
 ## Design
 
@@ -12,16 +16,34 @@ The general idea of Toru is to have a to-do app which uses distinct, mutually ex
 
 For example, in a given vault, one may have a big project they are working on. This project, and all of the subtasks are listed together on the top level (and not organised according to projects). In order to conveniently organise and view tasks, use tags and dependencies, and filter searches for tasks to get the desired information. This allows you to categorise tasks even when they do not fall into any one obvious category.
 
-## Getting Started
+---
 
-To get started, install Toru by running:
+## Installation
+
+The easiest way to install is from [crates.io](https://crates.io/crates/toru) with cargo:
+
 ```
 cargo install toru
 ```
 
-Then type `toru` in the terminal to be greeted by the following help screen:
+Alternatively you can build from source:
+
 ```
-toru 0.1.1
+git clone https://github.com/aaron-jack-manning/toru.git
+cd toru
+cargo build --release
+```
+
+which will create an executable at `/target/release/toru`.
+
+---
+
+## Getting Started
+
+Simply type `toru` in terminal to display help information for each command:
+
+```
+toru 0.1.2
 Aaron Manning <contact@aaronmanning.net>
 A command line task manager.
 
@@ -43,6 +65,8 @@ SUBCOMMANDS:
     gitignore    Adds the recommended .gitignore file to the vault
     list         Lists tasks according to the specified ordering and filters
     new          Create a new task
+    stats        For statistics about the state of your vault
+    svn          Run Subversion commands at the root of the vault
     switch       Switches to the specified vault
     track        For tracking time against a note
     vault        Commands for interacting with vaults
@@ -53,11 +77,13 @@ You can view any help screen by passing in the `-H` or `--help` flag, and the in
 
 To start up you will need a vault to store tasks in, which you can create by running `toru vault new <NAME> <PATH>`.
 
-If you ever want to all vaults, along with which is the current one, run `toru vault list`.
+If you ever want to view all vaults, along with which is the current one, run `toru vault list`.
 
 Then you can run `toru new` to create your first task.
 
-## Planned Features and Changes:
+---
+
+## Roadmap
 
 - Options to configure and customise output of `list`
     - Options for which field to order by, and how to order (ascending or descending)
