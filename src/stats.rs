@@ -2,13 +2,13 @@ use crate::tasks;
 use crate::error;
 
 use std::path;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error::Error> {
 
     let tasks = tasks::Task::load_all(vault_folder, true)?;
 
-    let mut times = HashMap::<String, tasks::Duration>::new();
+    let mut times = BTreeMap::<String, tasks::Duration>::new();
 
     for task in &tasks {
         if !task.data.discarded {
@@ -29,7 +29,7 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
                         *time = *time + time_per_tag;
                     },
                     None => {
-                        times.insert(tag.clone(), time);
+                        times.insert(tag.clone(), time_per_tag);
                     }
                 }
             }
@@ -43,8 +43,8 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
     table.set_header(vec!["Tag", "Time"]);
 
-    for (tag, duration) in &times {
 
+    for (tag, duration) in times {
         table.add_row(
             vec![
                 tag.clone(),

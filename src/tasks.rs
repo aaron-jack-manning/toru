@@ -76,7 +76,7 @@ pub struct InternalTask {
     pub priority : Priority,
     pub due : Option<chrono::NaiveDateTime>,
     pub created : chrono::NaiveDateTime,
-    pub complete : bool,
+    pub completed : Option<chrono::NaiveDateTime>,
     pub discarded : bool,
     pub info : Option<String>,
     pub time_entries : Vec<TimeEntry>,
@@ -109,7 +109,7 @@ impl Task {
             due,
             time_entries : Vec::new(),
             created : chrono::Local::now().naive_local(),
-            complete : false,
+            completed : None,
             discarded : false,
         };
 
@@ -235,7 +235,7 @@ impl Task {
             let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
 
             (
-                format!("[{}] {} {}{}", if self.data.complete {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded)),
+                format!("[{}] {} {}{}", if self.data.completed.is_some() {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded)),
                 5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count()
             )
         };
@@ -248,7 +248,7 @@ impl Task {
         println!("Created:      {}", self.data.created.round_subsecs(0));
         
         if let Some(due) = self.data.due {
-            let due = format_due_date(&due, !self.data.complete, true);
+            let due = format_due_date(&due, self.data.completed.is_none(), true);
             println!("Due:          {}", due);
         }
 
@@ -373,7 +373,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
 
     for task in tasks {
-        if !task.data.discarded && !task.data.complete {
+        if !task.data.discarded && task.data.completed.is_none() {
 
             let duration = TimeEntry::total(&task.data.time_entries);
 
@@ -384,7 +384,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
                     format_hash_set(&task.data.tags)?,
                     task.data.priority.to_string(),
                     if duration == Duration::zero() { String::new() } else { duration.to_string() },
-                    match task.data.due { Some(due) => format_due_date(&due, !task.data.complete, false), None => String::new() },
+                    match task.data.due { Some(due) => format_due_date(&due, task.data.completed.is_none(), false), None => String::new() },
                 ]
             );
         }
@@ -435,7 +435,7 @@ impl ops::Div<usize> for Duration {
 
     fn div(self, divisor : usize) -> Self::Output {
         let total_mins = f64::from(self.hours * 60 + self.minutes);
-        let divided_mins = total_mins / divisor as f64;
+        let divided_mins = total_mins / (divisor as f64);
         let divided_mins = divided_mins.round() as u16;
 
         Self {

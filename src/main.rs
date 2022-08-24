@@ -41,7 +41,7 @@ enum Command {
     View {
         id_or_name : String,
     },
-    /// Edit a note directly.
+    /// Edit a task directly.
     Edit {
         id_or_name : String,
         /// Edit the info specifically in its own file.
@@ -83,7 +83,7 @@ enum Command {
         // - which columns to include
         // - filters which exclude values
     },
-    /// For tracking time against a note.
+    /// For tracking time against a task.
     Track {
         id_or_name : String,
         #[clap(short='H', default_value_t=0)]
@@ -294,7 +294,7 @@ fn program() -> Result<(), error::Error> {
             Complete { id_or_name } => {
                 let id = state.name_or_id_to_id(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
-                task.data.complete = true;
+                task.data.completed = Some(chrono::Local::now().naive_local());
                 task.save()?;
                 println!("Marked task {} as complete", colour::id(&id.to_string()));
             },
