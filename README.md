@@ -43,7 +43,7 @@ which will create an executable at `/target/release/toru`.
 Simply type `toru` in terminal to display help information for each command:
 
 ```
-toru 0.1.2
+toru 0.1.4
 Aaron Manning <contact@aaronmanning.net>
 A command line task manager.
 
@@ -60,7 +60,7 @@ SUBCOMMANDS:
     config       For making changes to global configuration
     delete       Delete a task completely
     discard      Discard a task without deleting the underlying file
-    edit         Edit a note directly
+    edit         Edit a task directly
     git          Run Git commands at the root of the vault
     gitignore    Adds the recommended .gitignore file to the vault
     list         Lists tasks according to the specified ordering and filters
@@ -68,7 +68,7 @@ SUBCOMMANDS:
     stats        For statistics about the state of your vault
     svn          Run Subversion commands at the root of the vault
     switch       Switches to the specified vault
-    track        For tracking time against a note
+    track        For tracking time against a task
     vault        Commands for interacting with vaults
     view         Displays the specified task in detail
 ```
