@@ -76,7 +76,6 @@ Then you can run `toru new` to create your first task.
     - Keep track of completed date, and correctly update upon marking as complete or manual edit
     - Disallow removing it in a manual edit unless complete is also marked to false
     - Add to statistics
-- SVN integration
 - Statistics
     - Completed tasks over last x days
     - Improve formatting to terminal to make easier to read for `tracked` command

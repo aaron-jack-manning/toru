@@ -4,19 +4,23 @@ use std::fs;
 use std::path;
 use std::process;
 
-pub fn run_command(args : Vec<String>, vault_folder : &path::Path) -> Result<(), error::Error> {
+pub enum Vcs {
+    Git,
+    Svn,
+}
 
-    let mut command = process::Command::new("git");
+pub fn command(args : Vec<String>, vcs : Vcs, vault_folder : &path::Path) -> Result<(), error::Error> {
+
+    let mut command = match vcs {
+        Vcs::Git => process::Command::new("git"),
+        Vcs::Svn => process::Command::new("svn"),
+    };
 
     let mut child = command 
         .current_dir(vault_folder)
-        // Force colour output even though run from other process.
-        .args(["-c", "color.ui=always"])
         .args(args)
         .spawn()?;
 
-    // No point handling the potential error code as Git will report the error directly with more
-    // info.
     let _ = child.wait()?;
 
     Ok(())

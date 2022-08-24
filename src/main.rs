@@ -1,4 +1,4 @@
-mod git;
+mod vcs;
 mod edit;
 mod vault;
 mod error;
@@ -62,6 +62,11 @@ enum Command {
     /// Run Git commands at the root of the vault.
     #[clap(trailing_var_arg=true)]
     Git {
+        args : Vec<String>,
+    },
+    /// Run Subversion commands at the root of the vault.
+    #[clap(trailing_var_arg=true)]
+    Svn {
         args : Vec<String>,
     },
     /// Adds the recommended .gitignore file to the vault.
@@ -216,12 +221,16 @@ fn program() -> Result<(), error::Error> {
     }
     else if let Git { args } = command {
         let vault_folder = &config.current_vault()?.1;
-        git::run_command(args, vault_folder)?;
+        vcs::command(args, vcs::Vcs::Git, vault_folder)?;
     }
     else if command == GitIgnore {
         let vault_folder = &config.current_vault()?.1;
-        git::create_gitignore(vault_folder)?;
+        vcs::create_gitignore(vault_folder)?;
         println!("Default .gitignore file created");
+    }
+    else if let Svn { args } = command {
+        let vault_folder = &config.current_vault()?.1;
+        vcs::command(args, vcs::Vcs::Svn, vault_folder)?;
     }
     // Commands that require loading in the state.
     else {
@@ -294,7 +303,7 @@ fn program() -> Result<(), error::Error> {
                 println!("Deleted all discarded tasks");
             }
             // All commands which are dealt with in if let chain at start.
-            Vault(_) | Config(_) | Git { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
+            Vault(_) | Config(_) | Git { args : _ } | Svn { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
         }
 
         state.save()?;
