@@ -19,7 +19,7 @@ struct Args {
 }
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]
-#[clap(version, help_short='H', about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
+#[clap(version, help_short='h', about, author, global_setting=clap::AppSettings::DisableHelpSubcommand)]
 enum Command {
     /// Create a new task.
     New {
@@ -33,6 +33,9 @@ enum Command {
         dependencies : Vec<Id>,
         #[clap(short, long, value_enum)]
         priority : Option<tasks::Priority>,
+        /// Due date, expecting format yyyy-mm-ddThh:mm:ss
+        #[clap(long)]
+        due : Option<chrono::NaiveDateTime>,
     },
     /// Displays the specified task in detail.
     View {
@@ -83,9 +86,9 @@ enum Command {
     /// For tracking time against a note.
     Track {
         id_or_name : String,
-        #[clap(short, default_value_t=0)]
+        #[clap(short='H', default_value_t=0)]
         hours : u16,
-        #[clap(short, default_value_t=0)]
+        #[clap(short='M', default_value_t=0)]
         minutes : u16,
     },
     /// For statistics about the state of your vault.
@@ -226,7 +229,7 @@ fn program() -> Result<(), error::Error> {
     else if command == GitIgnore {
         let vault_folder = &config.current_vault()?.1;
         vcs::create_gitignore(vault_folder)?;
-        println!("Default .gitignore file created");
+        println!("Default {} file created", colour::file(".gitignore"));
     }
     else if let Svn { args } = command {
         let vault_folder = &config.current_vault()?.1;
@@ -238,8 +241,8 @@ fn program() -> Result<(), error::Error> {
         let mut state = state::State::load(vault_folder)?;
 
         match command {
-            New { name, info, tags, dependencies, priority } => {
-                let task = tasks::Task::new(name, info, tags, dependencies, priority, vault_folder, &mut state)?;
+            New { name, info, tags, dependencies, priority, due } => {
+                let task = tasks::Task::new(name, info, tags, dependencies, priority, due, vault_folder, &mut state)?;
                 println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
             },
             Delete { id_or_name } => {

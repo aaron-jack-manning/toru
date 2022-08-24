@@ -22,6 +22,8 @@ pub struct InternalState {
     pub next_id : Id,
     #[serde_as(as = "HashMap<DisplayFromStr, _>")]
     pub index : HashMap<String, Vec<Id>>,
+    //#[serde_as(as = "HashMap<DisplayFromStr, _>")]
+    //pub dependencies : HashMap<Id, Vec<Id>>,
 }
 
 impl State {
@@ -69,6 +71,8 @@ impl State {
                     },
                 }
             }
+
+            //
 
             let data = InternalState {
                 next_id : u64::try_from(max_id + 1).unwrap(),

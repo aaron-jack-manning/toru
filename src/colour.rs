@@ -34,3 +34,26 @@ pub fn id(text : &str) -> colored::ColoredString {
 pub fn greyed_out(text : &str) -> colored::ColoredString {
     text.truecolor(99, 110, 114)
 }
+
+
+pub mod due_date {
+    use colored::Colorize;
+
+    pub fn overdue(text : &str) -> colored::ColoredString {
+        text.truecolor(192, 57, 43)
+    }
+
+    pub fn very_close(text : &str) -> colored::ColoredString {
+        text.truecolor(231, 76, 60)
+
+    }
+
+    pub fn close(text : &str) -> colored::ColoredString {
+        text.truecolor(230, 126, 34)
+
+    }
+
+    pub fn plenty_of_time(text : &str) -> colored::ColoredString {
+        text.truecolor(46, 204, 113)
+    }
+}

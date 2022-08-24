@@ -11,6 +11,7 @@ use std::path;
 use std::io::{Write, Seek};
 use std::collections::HashSet;
 use colored::Colorize;
+use chrono::SubsecRound;
 
 pub type Id = u64;
 
@@ -73,7 +74,7 @@ pub struct InternalTask {
     pub tags : HashSet<String>,
     pub dependencies : HashSet<Id>,
     pub priority : Priority,
-    //due : Option<chrono::NaiveDateTime>,
+    pub due : Option<chrono::NaiveDateTime>,
     pub created : chrono::NaiveDateTime,
     pub complete : bool,
     pub discarded : bool,
@@ -82,7 +83,7 @@ pub struct InternalTask {
 }
 
 impl Task {
-    pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
+    pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, due : Option<chrono::NaiveDateTime>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
 
         if name.chars().all(|c| c.is_numeric()) {
             return Err(error::Error::Generic(String::from("Name must not be purely numeric")));
@@ -105,8 +106,9 @@ impl Task {
             tags : tags.into_iter().collect(),
             dependencies : dependencies.into_iter().collect(),
             priority : priority.unwrap_or_default(),
+            due,
             time_entries : Vec::new(),
-            created : chrono::Utc::now().naive_local(),
+            created : chrono::Local::now().naive_local(),
             complete : false,
             discarded : false,
         };
@@ -243,7 +245,12 @@ impl Task {
 
         println!("Priority:     {}", self.data.priority.coloured());
         println!("Tags:         [{}]", format_hash_set(&self.data.tags)?);
-        println!("Created:      {}", self.data.created);
+        println!("Created:      {}", self.data.created.round_subsecs(0));
+        
+        if let Some(due) = self.data.due {
+            let due = format_due_date(&due, !self.data.complete, true);
+            println!("Due:          {}", due);
+        }
 
         if let Some(mut info) = self.data.info.clone() {
             let mut max_line_width = 0;
@@ -294,6 +301,65 @@ fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error:
     Ok(output)
 }
 
+fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, colour : bool) -> String {
+    let remaining = *due - chrono::Local::now().naive_local();
+
+    let fuzzy_period = if remaining.num_days() != 0 {
+        let days = remaining.num_days().abs();
+        format!("{} day{}", days, if days == 1 {""} else {"s"})
+    }
+    else if remaining.num_hours() != 0 {
+        let hours = remaining.num_hours().abs();
+        format!("{} hour{}", hours, if hours == 1 {""} else {"s"})
+    }
+    else if remaining.num_minutes() != 0 {
+        let minutes = remaining.num_minutes().abs();
+        format!("{} minute{}", minutes, if minutes == 1 {""} else {"s"})
+    }
+    else {
+        let seconds = remaining.num_seconds().abs();
+        format!("{} second{}", seconds, if seconds == 1 {""} else {"s"})
+    };
+
+    if include_fuzzy_period {
+        if colour {
+            if remaining < chrono::Duration::zero() {
+                format!("{} {}", due.round_subsecs(0), colour::due_date::overdue(&format!("({} overdue)", fuzzy_period)))
+            }
+            else if remaining < chrono::Duration::days(1) {
+                format!("{} {}", due.round_subsecs(0), colour::due_date::very_close(&format!("({} remaining)", fuzzy_period)))
+
+            }
+            else if remaining < chrono::Duration::days(3) {
+                format!("{} {}", due.round_subsecs(0), colour::due_date::close(&format!("({} remaining)", fuzzy_period)))
+
+            }
+            else {
+                format!("{} {}", due.round_subsecs(0), colour::due_date::plenty_of_time(&format!("({} remaining)", fuzzy_period)))
+            }
+        }
+        else {
+            if remaining < chrono::Duration::zero() {
+                format!("{} {}", due.round_subsecs(0), format!("({} overdue)", fuzzy_period))
+            }
+            else if remaining < chrono::Duration::days(1) {
+                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
+
+            }
+            else if remaining < chrono::Duration::days(3) {
+                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
+
+            }
+            else {
+                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
+            }
+        }
+    }
+    else {
+        format!("{}", due.round_subsecs(0))
+    }
+}
+
 pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
 
     let mut table = comfy_table::Table::new();
@@ -301,7 +367,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
         .load_preset(comfy_table::presets::UTF8_FULL)
         .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-    table.set_header(vec!["Id", "Name", "Tags", "Priority", "Time"]);
+    table.set_header(vec!["Id", "Name", "Tags", "Priority", "Tracked", "Due"]);
 
     let mut tasks = Task::load_all(vault_folder, true)?;
     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
@@ -318,6 +384,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
                     format_hash_set(&task.data.tags)?,
                     task.data.priority.to_string(),
                     if duration == Duration::zero() { String::new() } else { duration.to_string() },
+                    match task.data.due { Some(due) => format_due_date(&due, !task.data.complete, false), None => String::new() },
                 ]
             );
         }
