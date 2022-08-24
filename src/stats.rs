@@ -72,6 +72,7 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
     table.set_header(vec!["Tag", "Time"]);
 
 
+    let mut total_duration = tasks::Duration::zero();
     for (tag, duration) in times {
         table.add_row(
             vec![
@@ -79,7 +80,16 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
                 duration.to_string(),
             ]
         );
+
+        total_duration = total_duration + duration;
     }
+
+    table.add_row(
+        vec![
+            String::from("Total"),
+            total_duration.to_string(),
+        ]
+    );
 
     println!("{}", table);
 

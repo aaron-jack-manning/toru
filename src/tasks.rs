@@ -273,9 +273,16 @@ impl Task {
             // Sort entries by date.
             entries.sort_by(|e1, e2| e1.logged_date.cmp(&e2.logged_date));
 
-            println!("Time Entries:");
+            let mut total = Duration::zero();
+            let mut lines = Vec::with_capacity(entries.len());
             for entry in &entries {
-                println!("    {} [{}]", entry.duration, entry.logged_date);
+                lines.push(format!("    {} [{}]", entry.duration, entry.logged_date));
+                total = total + entry.duration;
+            }
+
+            println!("Time Entries (totaling {}):", total);
+            for line in lines {
+                println!("{}", line);
             }
         }
 
