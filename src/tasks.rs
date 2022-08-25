@@ -17,7 +17,7 @@ use chrono::SubsecRound;
 pub type Id = u64;
 
 pub struct Task {
-    path : path::PathBuf,
+    pub path : path::PathBuf,
     file : fs::File,
     pub data : InternalTask,
 }
@@ -83,6 +83,7 @@ pub struct InternalTask {
 }
 
 impl Task {
+    /// Creates a new task from the input data.
     pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, due : Option<chrono::NaiveDateTime>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
 
         if name.chars().all(|c| c.is_numeric()) {
@@ -140,8 +141,7 @@ impl Task {
         })
     }
 
-    /// Less graceful error handling on this for task not existing. Only use this externally when
-    /// in edit mode.
+    /// Loads a task directly from its path, for use with the temporary edit file.
     pub fn load_direct(path : path::PathBuf, read_only : bool) -> Result<Self, error::Error> {
         let file_contents = fs::read_to_string(&path)?;
 
@@ -164,14 +164,14 @@ impl Task {
         })
     }
 
-    /// The read_only flag is so that the file will not be truncated, and therefore doesn't need to
-    /// be saved when finished.
+    /// Loads a task in to memory.
     pub fn load(id : Id, vault_folder : &path::Path, read_only : bool) -> Result<Self, error::Error> {
         let path = Task::check_exists(id, vault_folder)?;
 
         Task::load_direct(path, read_only)
     }
 
+    /// Get an iterator over the IDs of tasks in a vault.
     fn id_iter(vault_folder : &path::Path) -> impl Iterator<Item = u64> {
         fs::read_dir(vault_folder.join("notes"))
         .unwrap()
@@ -181,6 +181,7 @@ impl Task {
         .filter_map(|n| n.parse::<Id>().ok())
     }
 
+    /// Load all tasks of a vault into a `Vec`.
     pub fn load_all(vault_folder : &path::Path, read_only : bool) -> Result<Vec<Self>, error::Error> {
         let ids = Task::id_iter(vault_folder);
         
@@ -192,6 +193,7 @@ impl Task {
         Ok(tasks)
     }
 
+    /// Load all tasks of a vault into a `HashMap`.
     pub fn load_all_as_map(vault_folder : &path::Path, read_only : bool) -> Result<HashMap<Id, Self>, error::Error> {
         let ids = Task::id_iter(vault_folder);
 
@@ -203,10 +205,8 @@ impl Task {
         Ok(tasks)
     }
 
-    pub fn path(&self) -> &path::Path {
-        &self.path
-    }
-
+    /// Checks that a task with the prodided ID exists in the provided vault_folder. Returns the
+    /// path of that task.
     pub fn check_exists(id : Id, vault_folder : &path::Path) -> Result<path::PathBuf, error::Error> {
         let path = vault_folder.join("notes").join(format!("{}.toml", id));
         if path.exists() && path.is_file() {
@@ -217,6 +217,7 @@ impl Task {
         }
     }
 
+    /// Saves the in memory task data to the corresponding file.
     pub fn save(self) -> Result<(), error::Error> {
         let Self {
             path : _,
@@ -233,6 +234,7 @@ impl Task {
         Ok(())
     }
 
+    /// Deletes the task.
     pub fn delete(self) -> Result<(), error::Error> {
         let Self {
             path,
@@ -246,6 +248,7 @@ impl Task {
         Ok(())
     }
 
+    /// Displays a task to the terminal.
     pub fn display(&self, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
         
         fn line(len : usize) {
@@ -424,34 +427,172 @@ fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, co
     }
 }
 
-pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
+
+
+
+
+pub fn list(options : super::ListOptions, vault_folder : &path::Path) -> Result<(), error::Error> {
+
+    let expected = super::ListOptions {
+        name : false,
+        tracked : false,
+        due : false,
+        tags : false,
+        priority : false,
+        status : false,
+        created : false,
+        sort_by : super::SortBy::Id,
+        sort_type : super::SortType::Asc,
+        before : None,
+        after : None,
+        due_in : None,
+        include_complete : false,
+    };
+
+    // If the arguments are not given, use a set of defaults.
+    let options = if options == expected {
+        super::ListOptions::default()
+    }
+    else {
+        options
+    };
 
     let mut table = comfy_table::Table::new();
     table
         .load_preset(comfy_table::presets::UTF8_FULL)
         .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-    table.set_header(vec!["Id", "Name", "Tags", "Priority", "Tracked", "Due"]);
 
-    let mut tasks = Task::load_all(vault_folder, true)?;
-    tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
+
+    let mut tasks : Box<dyn Iterator<Item = Task>> = Box::new(Task::load_all(vault_folder, true)?.into_iter());
+
+    // Filter the tasks
+    if let Some(before) = options.before {
+        tasks = Box::new(tasks.filter(move |t| t.data.created < before));
+    }
+    if let Some(after) = options.after {
+        tasks = Box::new(tasks.filter(move |t| t.data.created > after));
+    }
+    if let Some(due_in) = options.due_in {
+        let now = chrono::Local::now().naive_local();
+        tasks = Box::new(tasks.filter(move |t| {
+            if let Some(due) = t.data.due {
+                due < now + chrono::Duration::days(i64::from(due_in))
+            }
+            else {
+                false
+            }
+        }));
+    }
+    if !options.include_complete {
+        tasks = Box::new(tasks.filter(|t| t.data.completed.is_none()));
+    }
+
+    let mut tasks : Vec<Task> = tasks.collect();
+
+
+    // Sort the tasks
+    use super::{SortBy, SortType};
+    match options.sort_by {
+        SortBy::Id => {
+            match options.sort_type {
+                SortType::Asc => {
+                    tasks.sort_by(|t1, t2| t1.data.id.cmp(&t2.data.id));
+                },
+                SortType::Desc => {
+                    tasks.sort_by(|t1, t2| t2.data.id.cmp(&t1.data.id));
+                },
+            }
+        },
+        SortBy::Name => {
+            match options.sort_type {
+                SortType::Asc => {
+                    tasks.sort_by(|t1, t2| t1.data.name.cmp(&t2.data.name));
+                },
+                SortType::Desc => {
+                    tasks.sort_by(|t1, t2| t2.data.name.cmp(&t1.data.name));
+                },
+            }
+        },
+        SortBy::Due => {
+            match options.sort_type {
+                SortType::Asc => {
+                    tasks.sort_by(|t1, t2| t1.data.due.cmp(&t2.data.due));
+                },
+                SortType::Desc => {
+                    tasks.sort_by(|t1, t2| t2.data.due.cmp(&t1.data.due));
+                },
+            }
+        },
+        SortBy::Priority => {
+            match options.sort_type {
+                SortType::Asc => {
+                    tasks.sort_by(|t1, t2| t1.data.priority.cmp(&t2.data.priority));
+                },
+                SortType::Desc => {
+                    tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
+                },
+            }
+        },
+        SortBy::Created => {
+            match options.sort_type {
+                SortType::Asc => {
+                    tasks.sort_by(|t1, t2| t1.data.created.cmp(&t2.data.created));
+                },
+                SortType::Desc => {
+                    tasks.sort_by(|t1, t2| t2.data.created.cmp(&t1.data.created));
+                },
+            }
+        },
+    }
+
+    // Include the required columns
+    let mut headers = vec!["Id"];
+
+    if options.name { headers.push("Name") };
+    if options.tracked { headers.push("Tracked") };
+    if options.due { headers.push("Due") };
+    if options.tags { headers.push("Tags") };
+    if options.priority { headers.push("Priority") };
+    if options.status { headers.push("Status") };
+    if options.created { headers.push("Created") };
+
+    table.set_header(headers);
 
     for task in tasks {
-        if task.data.completed.is_none() {
 
+        let mut row = vec![task.data.id.to_string()];
+
+        if options.name { row.push(task.data.name); }
+        if options.tracked {
             let duration = TimeEntry::total(&task.data.time_entries);
-
-            table.add_row(
-                vec![
-                    task.data.id.to_string(),
-                    task.data.name,
-                    format_hash_set(&task.data.tags)?,
-                    task.data.priority.to_string(),
-                    if duration == Duration::zero() { String::new() } else { duration.to_string() },
-                    match task.data.due { Some(due) => format_due_date(&due, task.data.completed.is_none(), false), None => String::new() },
-                ]
+            row.push(
+                if duration == Duration::zero() { String::new() } else { duration.to_string() }
             );
         }
+        if options.due {
+            row.push(match task.data.due {
+                Some(due) => format_due_date(&due, task.data.completed.is_none(), false),
+                None => String::new()
+            });
+        }
+        if options.tags { row.push(format_hash_set(&task.data.tags)?); }
+        if options.priority { row.push(task.data.priority.to_string()); }
+        if options.status { 
+            row.push(
+                if task.data.completed.is_some() {
+                    String::from("complete")
+                }
+                else {
+                    String::from("incomplete")
+                }
+            );
+        }
+        if options.created { 
+            row.push(task.data.created.round_subsecs(0).to_string());
+        }
+
+        table.add_row(row);
     }
 
     println!("{}", table);

@@ -58,7 +58,7 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
 
     let temp_path = vault_folder.join("temp.toml");
 
-    fs::copy(task.path(), &temp_path)?;
+    fs::copy(&task.path, &temp_path)?;
 
     let status = open_editor(&temp_path, editor)?;
     

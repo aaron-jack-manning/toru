@@ -80,17 +80,3 @@ To start up you will need a vault to store tasks in, which you can create by run
 If you ever want to view all vaults, along with which is the current one, run `toru vault list`.
 
 Then you can run `toru new` to create your first task.
-
----
-
-## Roadmap
-
-- Options to configure and customise output of `list`
-    - Simple query language to select:
-        - which columns to include
-        - which column to order by (and if ascending or descending)
-    - and to filter by
-        - tags within a specified collection
-        - only include tasks with incomplete dependencies, and similarly only tasks which are not dependents
-        - due date, completion date, etc greater than or less than specific value
-    - If no values given, use a default query stored in `state.toml`

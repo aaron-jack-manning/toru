@@ -14,6 +14,8 @@ use tasks::Id;
 
 use std::path;
 
+
+
 #[derive(clap::Parser, Debug)]
 struct Args {
     #[clap(subcommand)]
@@ -71,13 +73,10 @@ enum Command {
     /// Adds the recommended .gitignore file to the vault.
     #[clap(name="gitignore")]
     GitIgnore,
-    /// Lists tasks according to the specified ordering and filters.
+    /// Lists tasks according to the specified fields, ordering and filters.
     List {
-        // Need to have options for:
-        // - column to order by
-        // - ascending or descending
-        // - which columns to include
-        // - filters which exclude values
+        #[clap(flatten)]
+        options : ListOptions,
     },
     /// For tracking time against a task.
     Track {
@@ -102,6 +101,72 @@ enum Command {
     },
 }
 
+#[derive(clap::StructOpt, Debug, PartialEq, Eq)]
+pub struct ListOptions {
+    #[clap(long)]
+    name : bool,
+    #[clap(long)]
+    tracked : bool,
+    #[clap(long)]
+    due : bool,
+    #[clap(long)]
+    tags : bool,
+    #[clap(long)]
+    priority : bool,
+    #[clap(long)]
+    status : bool,
+    #[clap(long)]
+    created : bool,
+    #[clap(long, value_enum, default_value_t=SortBy::Id)]
+    sort_by : SortBy,
+    #[clap(long, value_enum, default_value_t=SortType::Asc)]
+    sort_type : SortType,
+    #[clap(long)]
+    before : Option<chrono::NaiveDateTime>,
+    #[clap(long)]
+    after : Option<chrono::NaiveDateTime>,
+    #[clap(long)]
+    due_in : Option<u16>,
+    #[clap(long)]
+    include_complete : bool,
+}
+
+impl Default for ListOptions {
+    fn default() -> Self {
+        Self {
+            name : true,
+            tracked : true,
+            due : true,
+            tags : true,
+            priority : true,
+            status : false,
+            created : false,
+            sort_by : SortBy::Created,
+            sort_type : SortType::Desc,
+            before : None,
+            after : None,
+            due_in : None,
+            include_complete : false,
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+pub enum SortType {
+    #[default]
+    Asc,
+    Desc,
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+pub enum SortBy {
+    #[default]
+    Id,
+    Name,
+    Due,
+    Priority,
+    Created,
+}
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]
 enum StatsCommand {
@@ -296,8 +361,8 @@ fn program() -> Result<(), error::Error> {
                 task.save()?;
                 println!("Marked task {} as complete", colour::id(id));
             },
-            List {} => {
-                tasks::list(vault_folder)?;
+            List { options } => {
+                tasks::list(options, vault_folder)?;
             },
             // All commands which are dealt with in if let chain at start.
             Vault(_) | Config(_) | Git { args : _ } | Svn { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
