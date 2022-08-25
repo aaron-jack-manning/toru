@@ -85,16 +85,19 @@ Then you can run `toru new` to create your first task.
 
 ## Roadmap
 
-- Options to configure and customise output of `list`
-    - Options for which field to order by, and how to order (ascending or descending)
-    - Options for which columns to include
-    - Filters, to exclude notes of a certain type
-    - If no values given, read a set of defaults from a `list.toml` file, which can be edited from a similar command
 - Dependency tracker
     - Store dependencies in a file and correctly update them upon creation and removal of notes
     - Error if any circular dependencies are introduced
     - Make sure dependencies written to file are only those that could be successfully created
     - List dependencies as a tree on note view below info
+    - Disallow marking a task as complete if it has incomplete dependencies
+- Options to configure and customise output of `list`
+    - Simple query language to select:
+        - which columns to include
+        - which column to order by (and if ascending or descending)
+    - and to filter by
+        - tags within a specified collection
+        - only include tasks with incomplete dependencies, and similarly only tasks which are not dependents
+        - due date, completion date, etc greater than or less than specific value
+    - If no values given, use a default query stored in `state.toml`
 - Automatically added recurring notes system
-- Visual changes
-    - All tabled, listed commands need to have cleaner and clearer output, more consistent with viewing individual tasks
