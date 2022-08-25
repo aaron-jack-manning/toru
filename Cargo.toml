@@ -13,9 +13,7 @@ clap = { version = "3.2.17", features = ["derive"] }
 colored = "2.0.0"
 comfy-table = "6.0.0"
 confy = "0.4.0"
-petgraph = { version = "0.6.2", features = ["serde_derive", "serde", "serde-1"] }
 serde = { version = "1.0.143", features = ["derive"] }
 serde_with = "2.0.0"
-termsize = "0.1.6"
 toml = "0.5.9"
 trash = "2.1.5"
