@@ -81,8 +81,8 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
             }
             // Name change means index needs to be updated.
             if edited_task.data.name != task.data.name {
-                state.index_remove(task.data.name.clone(), id);
-                state.index_insert(edited_task.data.name.clone(), id);
+                state.data.index.remove(task.data.name.clone(), id);
+                state.data.index.insert(edited_task.data.name.clone(), id);
             }
 
             mem::swap(&mut edited_task.data, &mut task.data);

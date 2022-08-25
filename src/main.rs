@@ -1,6 +1,7 @@
 mod vcs;
 mod edit;
 mod vault;
+mod index;
 mod error;
 mod tasks;
 mod state;
@@ -252,21 +253,21 @@ fn program() -> Result<(), error::Error> {
                 println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
             },
             Delete { id_or_name } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 let task = tasks::Task::load(id, vault_folder, false)?;
                 let name = task.data.name.clone();
-                state.index_remove(task.data.name.clone(), task.data.id);
+                state.data.index.remove(task.data.name.clone(), task.data.id);
                 task.delete()?;
 
                 println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
             },
             View { id_or_name } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 let task = tasks::Task::load(id, vault_folder, true)?;
                 task.display()?;
             },
             Edit { id_or_name, info } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 if info {
                     edit::edit_info(id, vault_folder.clone(), &config.editor)?;
                 }
@@ -276,7 +277,7 @@ fn program() -> Result<(), error::Error> {
                 println!("Updated task {}", colour::id(&id.to_string()));
             },
             Track { id_or_name, hours, minutes } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
                 let entry =  tasks::TimeEntry::new(hours, minutes);
                 task.data.time_entries.push(entry);
@@ -294,14 +295,14 @@ fn program() -> Result<(), error::Error> {
                 }
             },
             Discard { id_or_name } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
                 task.data.discarded = true;
                 task.save()?;
                 println!("Discarded task {}", colour::id(&id.to_string()));
             },
             Complete { id_or_name } => {
-                let id = state.name_or_id_to_id(&id_or_name)?;
+                let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
                 task.data.completed = Some(chrono::Local::now().naive_local());
                 task.save()?;

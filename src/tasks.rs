@@ -119,7 +119,7 @@ impl Task {
         file.seek(io::SeekFrom::Start(0))?;
         file.write_all(file_contents.as_bytes())?;
 
-        state.index_insert(data.name.clone(), id);
+        state.data.index.insert(data.name.clone(), id);
 
         Ok(Task {
             path,
