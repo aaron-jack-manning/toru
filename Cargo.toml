@@ -1,6 +1,6 @@
 [package]
 name = "toru"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Aaron Manning <contact@aaronmanning.net>"]
 license = "GPL-2.0-only"

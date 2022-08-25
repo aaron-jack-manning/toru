@@ -43,7 +43,7 @@ which will create an executable at `/target/release/toru`.
 Simply type `toru` in terminal to display help information for each command:
 
 ```
-toru 0.2.0
+toru 0.2.1
 Aaron Manning <contact@aaronmanning.net>
 A command line task manager.
 
