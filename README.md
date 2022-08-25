@@ -55,15 +55,13 @@ OPTIONS:
     -V, --version    Print version information
 
 SUBCOMMANDS:
-    clean        Deletes all discarded tasks
     complete     Mark a task as complete
     config       For making changes to global configuration
-    delete       Delete a task completely
-    discard      Discard a task without deleting the underlying file
+    delete       Delete a task (move file to trash)
     edit         Edit a task directly
     git          Run Git commands at the root of the vault
     gitignore    Adds the recommended .gitignore file to the vault
-    list         Lists tasks according to the specified ordering and filters
+    list         Lists tasks according to the specified fields, ordering and filters
     new          Create a new task
     stats        For statistics about the state of your vault
     svn          Run Subversion commands at the root of the vault

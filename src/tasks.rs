@@ -446,7 +446,7 @@ pub fn list(options : super::ListOptions, vault_folder : &path::Path) -> Result<
         before : None,
         after : None,
         due_in : None,
-        include_complete : false,
+        include_completed : false,
     };
 
     // If the arguments are not given, use a set of defaults.
@@ -484,7 +484,7 @@ pub fn list(options : super::ListOptions, vault_folder : &path::Path) -> Result<
             }
         }));
     }
-    if !options.include_complete {
+    if !options.include_completed {
         tasks = Box::new(tasks.filter(|t| t.data.completed.is_none()));
     }
 

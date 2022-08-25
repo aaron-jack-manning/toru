@@ -14,8 +14,6 @@ use tasks::Id;
 
 use std::path;
 
-
-
 #[derive(clap::Parser, Debug)]
 struct Args {
     #[clap(subcommand)]
@@ -103,32 +101,45 @@ enum Command {
 
 #[derive(clap::StructOpt, Debug, PartialEq, Eq)]
 pub struct ListOptions {
+    /// Include name column.
     #[clap(long)]
     name : bool,
+    /// Include tracked time column.
     #[clap(long)]
     tracked : bool,
+    /// Include due date column.
     #[clap(long)]
     due : bool,
+    /// Include tags column.
     #[clap(long)]
     tags : bool,
+    /// Include priority column.
     #[clap(long)]
     priority : bool,
+    /// Include status column.
     #[clap(long)]
     status : bool,
+    /// Include created date column.
     #[clap(long)]
     created : bool,
+    /// The field to sort by.
     #[clap(long, value_enum, default_value_t=SortBy::Id)]
     sort_by : SortBy,
+    /// Sort ascending on descending.
     #[clap(long, value_enum, default_value_t=SortType::Asc)]
     sort_type : SortType,
+    /// Only include tasks created before a certain date.
     #[clap(long)]
     before : Option<chrono::NaiveDateTime>,
+    /// Only include tasks created after a certain date.
     #[clap(long)]
     after : Option<chrono::NaiveDateTime>,
+    /// Only include tasks due within a certain number of days.
     #[clap(long)]
     due_in : Option<u16>,
+    /// Include completed tasks in the list.
     #[clap(long)]
-    include_complete : bool,
+    include_completed : bool,
 }
 
 impl Default for ListOptions {
@@ -146,7 +157,7 @@ impl Default for ListOptions {
             before : None,
             after : None,
             due_in : None,
-            include_complete : false,
+            include_completed : false,
         }
     }
 }
