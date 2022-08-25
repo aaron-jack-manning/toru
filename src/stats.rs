@@ -39,26 +39,24 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
     let mut times = BTreeMap::<String, tasks::Duration>::new();
 
     for task in &tasks {
-        if !task.data.discarded {
-            let mut time = tasks::Duration::zero();
+        let mut time = tasks::Duration::zero();
 
-            for entry in &task.data.time_entries {
-                if chrono::Utc::now().naive_local().date() - entry.logged_date < chrono::Duration::days(i64::from(days)) {
-                    time = time + entry.duration;
-                }
+        for entry in &task.data.time_entries {
+            if chrono::Utc::now().naive_local().date() - entry.logged_date < chrono::Duration::days(i64::from(days)) {
+                time = time + entry.duration;
             }
+        }
 
-            let tag_count = task.data.tags.len();
-            let time_per_tag = time / tag_count;
+        let tag_count = task.data.tags.len();
+        let time_per_tag = time / tag_count;
 
-            for tag in &task.data.tags {
-                match times.get_mut(tag) {
-                    Some(time) => {
-                        *time = *time + time_per_tag;
-                    },
-                    None => {
-                        times.insert(tag.clone(), time_per_tag);
-                    }
+        for tag in &task.data.tags {
+            match times.get_mut(tag) {
+                Some(time) => {
+                    *time = *time + time_per_tag;
+                },
+                None => {
+                    times.insert(tag.clone(), time_per_tag);
                 }
             }
         }

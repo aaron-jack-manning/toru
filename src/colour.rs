@@ -1,3 +1,5 @@
+use crate::tasks::Id;
+
 use colored::Colorize;
 
 // Yellow
@@ -26,8 +28,8 @@ pub fn file(text : &str) -> colored::ColoredString {
 }
 
 // Blue
-pub fn id(text : &str) -> colored::ColoredString {
-    text.truecolor(52, 152, 219)
+pub fn id(id : Id) -> colored::ColoredString {
+    id.to_string().truecolor(52, 152, 219)
 }
 
 // Grey

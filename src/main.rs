@@ -5,6 +5,7 @@ mod index;
 mod error;
 mod tasks;
 mod state;
+mod graph;
 mod stats;
 mod config;
 mod colour;
@@ -49,14 +50,8 @@ enum Command {
         #[clap(short, long)]
         info : bool,
     },
-    /// Delete a task completely.
+    /// Delete a task (move file to trash).
     Delete {
-        id_or_name : String,
-    },
-    /// Deletes all discarded tasks.
-    Clean,
-    /// Discard a task without deleting the underlying file.
-    Discard {
         id_or_name : String,
     },
     /// Mark a task as complete.
@@ -165,10 +160,9 @@ fn main() {
 
     match result {
         Ok(()) => (),
-        Err(error::Error::Generic(message)) => {
-            println!("{} {}", colour::error("Error:"), message);
+        Err(err) => {
+            println!("{}", err);
         }
-        result => println!("{:?}", result),
     }
 }
 
@@ -250,21 +244,22 @@ fn program() -> Result<(), error::Error> {
         match command {
             New { name, info, tags, dependencies, priority, due } => {
                 let task = tasks::Task::new(name, info, tags, dependencies, priority, due, vault_folder, &mut state)?;
-                println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(&task.data.id.to_string()));
+                println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(task.data.id));
             },
             Delete { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;
                 let task = tasks::Task::load(id, vault_folder, false)?;
                 let name = task.data.name.clone();
                 state.data.index.remove(task.data.name.clone(), task.data.id);
+                state.data.deps.remove_node(task.data.id);
                 task.delete()?;
 
-                println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(&id.to_string()));
+                println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(id));
             },
             View { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;
                 let task = tasks::Task::load(id, vault_folder, true)?;
-                task.display()?;
+                task.display(vault_folder, &state)?;
             },
             Edit { id_or_name, info } => {
                 let id = state.data.index.lookup(&id_or_name)?;
@@ -274,7 +269,7 @@ fn program() -> Result<(), error::Error> {
                 else {
                     edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
                 }
-                println!("Updated task {}", colour::id(&id.to_string()));
+                println!("Updated task {}", colour::id(id));
             },
             Track { id_or_name, hours, minutes } => {
                 let id = state.data.index.lookup(&id_or_name)?;
@@ -294,27 +289,16 @@ fn program() -> Result<(), error::Error> {
                     }
                 }
             },
-            Discard { id_or_name } => {
-                let id = state.data.index.lookup(&id_or_name)?;
-                let mut task = tasks::Task::load(id, vault_folder, false)?;
-                task.data.discarded = true;
-                task.save()?;
-                println!("Discarded task {}", colour::id(&id.to_string()));
-            },
             Complete { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
                 task.data.completed = Some(chrono::Local::now().naive_local());
                 task.save()?;
-                println!("Marked task {} as complete", colour::id(&id.to_string()));
+                println!("Marked task {} as complete", colour::id(id));
             },
             List {} => {
                 tasks::list(vault_folder)?;
             },
-            Clean => {
-                tasks::clean(vault_folder)?;
-                println!("Deleted all discarded tasks");
-            }
             // All commands which are dealt with in if let chain at start.
             Vault(_) | Config(_) | Git { args : _ } | Svn { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
         }

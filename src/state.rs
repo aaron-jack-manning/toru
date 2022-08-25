@@ -1,6 +1,7 @@
 use crate::error;
 use crate::tasks;
 use crate::index;
+use crate::graph;
 use crate::tasks::Id;
 
 use std::fs;
@@ -18,6 +19,7 @@ pub struct State {
 pub struct InternalState {
     pub next_id : Id,
     pub index : index::Index,
+    pub deps : graph::Graph,
 }
 
 impl State {
@@ -52,14 +54,15 @@ impl State {
                 }
             }
 
-            // Calculating out the index.
+            // Calculating out the index and graph.
             let tasks = tasks::Task::load_all(vault_location, true)?;
-
             let index = index::Index::create(&tasks);
+            let deps = graph::Graph::create(tasks);
 
             let data = InternalState {
                 next_id : u64::try_from(max_id + 1).unwrap(),
                 index,
+                deps,
             };
 
             let mut file = fs::File::options()

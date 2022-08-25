@@ -14,6 +14,7 @@ pub enum Error {
     Utf8(str::Utf8Error),
     Fmt(fmt::Error),
     Generic(String),
+    Internal(String),
 }
 
 impl fmt::Display for Error {
@@ -26,7 +27,8 @@ impl fmt::Display for Error {
             Error::TomlSer(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::Utf8(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
             Error::Fmt(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Generic(message) => write!(f, "{}", message),
+            Error::Generic(message) => write!(f, "{} {}", colour::error("Error:"), message),
+            Error::Internal(message) => write!(f, "{} {}", colour::error("Internal Error:"), message),
         }
     }
 }

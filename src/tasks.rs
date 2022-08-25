@@ -1,5 +1,6 @@
 use crate::error;
 use crate::state;
+use crate::graph;
 use crate::colour;
 
 use std::io;
@@ -9,7 +10,7 @@ use std::ops;
 use std::mem;
 use std::path;
 use std::io::{Write, Seek};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use colored::Colorize;
 use chrono::SubsecRound;
 
@@ -77,7 +78,6 @@ pub struct InternalTask {
     pub due : Option<chrono::NaiveDateTime>,
     pub created : chrono::NaiveDateTime,
     pub completed : Option<chrono::NaiveDateTime>,
-    pub discarded : bool,
     pub info : Option<String>,
     pub time_entries : Vec<TimeEntry>,
 }
@@ -99,6 +99,19 @@ impl Task {
             .create(true)
             .open(&path)?;
 
+        // Adding to dependency graph appropriately.
+        state.data.deps.insert_node(id);
+        if !dependencies.is_empty() {
+            for dependency in &dependencies {
+                if state.data.deps.contains_node(*dependency) {
+                    state.data.deps.insert_edge(id, *dependency)?;
+                }
+                else {
+                    return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::id(*dependency))));
+                }
+            }
+        }
+
         let data = InternalTask {
             id,
             name,
@@ -110,7 +123,6 @@ impl Task {
             time_entries : Vec::new(),
             created : chrono::Local::now().naive_local(),
             completed : None,
-            discarded : false,
         };
 
         let file_contents = toml::to_string(&data)?;
@@ -160,19 +172,32 @@ impl Task {
         Task::load_direct(path, read_only)
     }
 
-    pub fn load_all(vault_folder : &path::Path, read_only : bool) -> Result<Vec<Self>, error::Error> {
-        let ids : Vec<Id> =
-            fs::read_dir(vault_folder.join("notes"))
-            .unwrap()
-            .map(|entry| entry.unwrap().path())
-            .filter(|p| p.is_file())
-            .map(|p| p.file_stem().unwrap().to_str().unwrap().to_string())
-            .filter_map(|n| n.parse::<Id>().ok())
-            .collect();
+    fn id_iter(vault_folder : &path::Path) -> impl Iterator<Item = u64> {
+        fs::read_dir(vault_folder.join("notes"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|p| p.is_file())
+        .map(|p| p.file_stem().unwrap().to_str().unwrap().to_string())
+        .filter_map(|n| n.parse::<Id>().ok())
+    }
 
-        let mut tasks = Vec::with_capacity(ids.len());
+    pub fn load_all(vault_folder : &path::Path, read_only : bool) -> Result<Vec<Self>, error::Error> {
+        let ids = Task::id_iter(vault_folder);
+        
+        let mut tasks = Vec::new();
         for id in ids {
             tasks.push(Task::load(id, vault_folder, read_only)?);
+        }
+
+        Ok(tasks)
+    }
+
+    pub fn load_all_as_map(vault_folder : &path::Path, read_only : bool) -> Result<HashMap<Id, Self>, error::Error> {
+        let ids = Task::id_iter(vault_folder);
+
+        let mut tasks = HashMap::new();
+        for id in ids {
+            tasks.insert(id, Task::load(id, vault_folder, read_only)?);
         }
 
         Ok(tasks)
@@ -188,7 +213,7 @@ impl Task {
             Ok(path)
         }
         else {
-            Err(error::Error::Generic(format!("No task with the ID {} exists", colour::id(&id.to_string()))))
+            Err(error::Error::Generic(format!("No task with the ID {} exists", colour::id(id))))
         }
     }
 
@@ -216,12 +241,12 @@ impl Task {
         } = self;
 
         mem::drop(file);
-        fs::remove_file(&path)?;
+        trash::delete(&path)?;
 
         Ok(())
     }
 
-    pub fn display(&self) -> Result<(), error::Error> {
+    pub fn display(&self, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
         
         fn line(len : usize) {
             for _ in 0..len {
@@ -231,12 +256,10 @@ impl Task {
         }
 
         let (heading, heading_length) = {
-            let id = &self.data.id.to_string();
-            let discarded = if self.data.discarded { String::from(" (discarded)") } else { String::new() };
 
             (
-                format!("[{}] {} {}{}", if self.data.completed.is_some() {"X"} else {" "}, colour::id(id), colour::task_name(&self.data.name), colour::greyed_out(&discarded)),
-                5 + self.data.name.chars().count() + id.chars().count() + discarded.chars().count()
+                format!("[{}] {} {}", if self.data.completed.is_some() {"X"} else {" "}, colour::id(self.data.id), colour::task_name(&self.data.name)),
+                5 + self.data.name.chars().count() + self.data.id.to_string().chars().count()
             )
         };
 
@@ -286,7 +309,12 @@ impl Task {
             }
         }
 
-        // dependencies as a tree
+        if !self.data.dependencies.is_empty() {
+            let tasks = Task::load_all_as_map(vault_folder, true)?;
+
+            println!("Dependencies:");
+            dependency_tree(self.data.id, &String::new(), true, &state.data.deps, &tasks);
+        }
         
         Ok(())
     }
@@ -306,6 +334,43 @@ fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error:
     }
 
     Ok(output)
+}
+
+fn dependency_tree(start : Id, prefix : &String, is_last_item : bool, graph : &graph::Graph, tasks : &HashMap<Id, Task>) {
+    let next = graph.edges.get(&start).unwrap();
+
+    {
+        let task = tasks.get(&start).unwrap();
+
+        let name = if task.data.completed.is_some() {
+            colour::greyed_out(&task.data.name)
+        }
+        else {
+            colour::task_name(&task.data.name)
+        };
+
+        if is_last_item {
+            println!("{}└──{} (ID: {})", prefix, name, colour::id(start))
+        }
+        else {
+            println!("{}├──{} (ID: {})", prefix, name, colour::id(start))
+        }
+    }
+
+    let count = next.len();
+
+    for (i, node) in next.iter().enumerate() {
+        let new_is_last_item = i == count - 1;
+
+        let new_prefix = if is_last_item {
+            format!("{}   ", prefix)
+        }
+        else {
+            format!("{}│  ", prefix)
+        };
+
+        dependency_tree(*node, &new_prefix, new_is_last_item, graph, tasks);
+    }
 }
 
 fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, colour : bool) -> String {
@@ -347,18 +412,10 @@ fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, co
         }
         else {
             if remaining < chrono::Duration::zero() {
-                format!("{} {}", due.round_subsecs(0), format!("({} overdue)", fuzzy_period))
-            }
-            else if remaining < chrono::Duration::days(1) {
-                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
-
-            }
-            else if remaining < chrono::Duration::days(3) {
-                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
-
+                format!("{} ({} overdue)", due.round_subsecs(0), fuzzy_period)
             }
             else {
-                format!("{} {}", due.round_subsecs(0), format!("({} remaining)", fuzzy_period))
+                format!("{} ({} remaining)", due.round_subsecs(0), fuzzy_period)
             }
         }
     }
@@ -380,7 +437,7 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
 
     for task in tasks {
-        if !task.data.discarded && task.data.completed.is_none() {
+        if task.data.completed.is_none() {
 
             let duration = TimeEntry::total(&task.data.time_entries);
 
@@ -398,19 +455,6 @@ pub fn list(vault_folder : &path::Path) -> Result<(), error::Error> {
     }
 
     println!("{}", table);
-
-    Ok(())
-}
-
-pub fn clean(vault_folder : &path::Path) -> Result<(), error::Error> {
-
-    let tasks = Task::load_all(vault_folder, false)?;
-
-    for task in tasks {
-        if task.data.discarded {
-            task.delete()?;
-        }
-    }
 
     Ok(())
 }
@@ -460,9 +504,9 @@ impl fmt::Display for Duration {
 
 impl TimeEntry {
     /// Adds up the times from a collection of time entries.
-    fn total(entries : &Vec<TimeEntry>) -> Duration {
+    fn total(entries : &[TimeEntry]) -> Duration {
         entries
-        .into_iter()
+        .iter()
         .map(|e| e.duration)
         .fold(Duration::zero(), |a, d| a + d)
     }

@@ -3,6 +3,7 @@ use crate::error;
 use crate::colour;
 use crate::tasks::Id;
 
+use std::fmt::Write;
 use std::collections::HashMap;
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -67,14 +68,14 @@ impl Index {
                         }
                         else {
                             let coloured_ids : Vec<_> =
-                                ids.into_iter()
-                                .map(|i| colour::id(&i.to_string()))
+                                ids.iter()
+                                .map(|i| colour::id(*i))
                                 .collect();
 
                             let mut display_ids = String::new();
 
                             for id in coloured_ids {
-                                display_ids.push_str(&format!("{}, ", id));
+                                write!(&mut display_ids, "{}, ", id).unwrap();
                             }
 
                             if !display_ids.is_empty() {
@@ -85,10 +86,9 @@ impl Index {
                             Err(error::Error::Generic(format!("Multiple notes (Ids: [{}]) by that name exist", display_ids)))
                         }
                     },
-                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::task_name(&name)))),
+                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::task_name(name)))),
                 }
             }
         }
-
     }
 }

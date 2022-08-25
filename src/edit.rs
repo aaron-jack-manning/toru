@@ -5,7 +5,9 @@ use std::process;
 
 use crate::tasks;
 use crate::error;
+use crate::graph;
 use crate::state;
+use crate::colour;
 use crate::tasks::Id;
 
 pub fn open_editor(path : &path::Path, editor : &str) -> Result<process::ExitStatus, error::Error> {
@@ -76,8 +78,24 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
             Err(error::Error::Generic(String::from("Name must not be purely numeric")))
         }
         else {
+            // Dependencies were edited so the graph needs to be updated.
             if edited_task.data.dependencies != task.data.dependencies {
-                // This is where the other dependencies graph needs to be updated.
+                for dependency in &task.data.dependencies {
+                    state.data.deps.remove_edge(id, *dependency);
+                }
+
+                for dependency in &edited_task.data.dependencies {
+                    if state.data.deps.contains_node(*dependency) {
+                        state.data.deps.insert_edge(id, *dependency)?;
+                    }
+                    else {
+                        return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::id(*dependency))));
+                    }
+                }
+
+                if let Some(cycle) = state.data.deps.find_cycle() {
+                    return Err(error::Error::Generic(format!("Note edit aborted due to circular dependency: {}", graph::format_cycle(&cycle))));
+                }
             }
             // Name change means index needs to be updated.
             if edited_task.data.name != task.data.name {
@@ -90,7 +108,7 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
 
             task.save()?;
 
-            fs::remove_file(&temp_path)?;
+            trash::delete(&temp_path)?;
 
             Ok(())
         }

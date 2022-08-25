@@ -60,7 +60,7 @@ impl Config {
                 Ok(())
             },
             None => {
-                Err(error::Error::Generic(format!("No vault named {} exists", colour::vault(&old_name))))
+                Err(error::Error::Generic(format!("No vault named {} exists", colour::vault(old_name))))
             }
         }
 
