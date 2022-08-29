@@ -4,12 +4,6 @@ A (currently in development) to do app for the command line.
 
 ---
 
-## Current Project Status
-
-This program is at the state where I am regularly using it, and it definately is workable. That said, it does not include all of the core features required to make it an adequate alternative to people who have a to-do system they like, and as such I am regularly making breaking changes. I don't recommend it if you want a stable to do system (yet, although I will update this message when that's no longer true) but if you like some of the ideas here and want to try it out, feedback is welcomed.
-
----
-
 ## Design
 
 The general idea of Toru is to have a to-do app which uses distinct, mutually exclusive vaults of tasks with configuration which is in a human readable and easy to export and import format (to completely separate personal, work, study, etc), however within a vault, to use tags and dependencies as a means of organising notes, rather than mutually exclusive folders.
@@ -43,7 +37,7 @@ which will create an executable at `/target/release/toru`.
 Simply type `toru` in terminal to display help information for each command:
 
 ```
-toru 0.2.1
+toru 0.3.0
 Aaron Manning <contact@aaronmanning.net>
 A command line task manager.
 
