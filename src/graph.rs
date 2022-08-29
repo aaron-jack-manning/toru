@@ -71,6 +71,19 @@ impl Graph {
         }
     }
 
+    /// Gets all tasks which have dependents.
+    pub fn get_tasks_with_dependents(&self) -> HashSet<Id> {
+        let mut tasks_with_dependents = HashSet::new();
+
+        for (_, outgoing) in &self.edges {
+            for edge in outgoing {
+                tasks_with_dependents.insert(*edge);
+            }
+        }
+
+        tasks_with_dependents
+    }
+
     pub fn find_cycle(&self) -> Option<Vec<Id>> {
 
         // All unvisited nodes, populated with all nodes at the start, to not miss disconnected

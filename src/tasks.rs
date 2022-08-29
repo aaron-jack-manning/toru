@@ -8,6 +8,7 @@ use std::fs;
 use std::fmt;
 use std::ops;
 use std::mem;
+use std::cmp;
 use std::path;
 use std::io::{Write, Seek};
 use std::collections::{HashSet, HashMap};
@@ -61,7 +62,7 @@ pub struct TimeEntry {
 }
 
 // Needs to preserve representation invariant of minutes < 60
-#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct Duration {
     hours : u16,
     minutes : u16,
@@ -427,35 +428,17 @@ fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, co
     }
 }
 
-
-
-
-
-pub fn list(options : super::ListOptions, vault_folder : &path::Path) -> Result<(), error::Error> {
-
-    let expected = super::ListOptions {
-        name : false,
-        tracked : false,
-        due : false,
-        tags : false,
-        priority : false,
-        status : false,
-        created : false,
-        sort_by : super::SortBy::Id,
-        sort_type : super::SortType::Asc,
-        before : None,
-        after : None,
-        due_in : None,
-        include_completed : false,
-    };
-
-    // If the arguments are not given, use a set of defaults.
-    let options = if options == expected {
-        super::ListOptions::default()
+fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::Ordering {
+    match (first, second) {
+        (None, None) => cmp::Ordering::Equal,
+        (Some(_), None) => cmp::Ordering::Less,
+        (None, Some(_)) => cmp::Ordering::Greater,
+        (Some(first), Some(second)) => first.cmp(second),
     }
-    else {
-        options
-    };
+}
+
+pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
+
 
     let mut table = comfy_table::Table::new();
     table
@@ -466,130 +449,214 @@ pub fn list(options : super::ListOptions, vault_folder : &path::Path) -> Result<
 
     let mut tasks : Box<dyn Iterator<Item = Task>> = Box::new(Task::load_all(vault_folder, true)?.into_iter());
 
-    // Filter the tasks
-    if let Some(before) = options.before {
-        tasks = Box::new(tasks.filter(move |t| t.data.created < before));
+    // Filter the tasks.
+    if let Some(date) = options.created_before {
+        tasks = Box::new(tasks.filter(move |t| t.data.created.date() <= date));
     }
-    if let Some(after) = options.after {
-        tasks = Box::new(tasks.filter(move |t| t.data.created > after));
+    if let Some(date) = options.created_after {
+        tasks = Box::new(tasks.filter(move |t| t.data.created.date() >= date));
     }
-    if let Some(due_in) = options.due_in {
-        let now = chrono::Local::now().naive_local();
+
+    if let Some(date) = options.due_before {
         tasks = Box::new(tasks.filter(move |t| {
-            if let Some(due) = t.data.due {
-                due < now + chrono::Duration::days(i64::from(due_in))
-            }
-            else {
-                false
+            match compare_due_dates(&t.data.due.map(|d| d.date()), &Some(date)) {
+                cmp::Ordering::Less | cmp::Ordering::Equal => true,
+                cmp::Ordering::Greater => false,
             }
         }));
     }
+
+    if let Some(date) = options.due_after {
+        tasks = Box::new(tasks.filter(move |t| {
+            match compare_due_dates(&t.data.due.map(|d| d.date()), &Some(date)) {
+                cmp::Ordering::Greater | cmp::Ordering::Equal => true,
+                cmp::Ordering::Less => false,
+            }
+        }));
+    }
+
     if !options.include_completed {
         tasks = Box::new(tasks.filter(|t| t.data.completed.is_none()));
+    }
+
+    if !options.tag.is_empty() {
+        let specified_tags : HashSet<_> = options.tag.iter().collect();
+
+        tasks = Box::new(tasks.filter(move |t| {
+            let task_tags : HashSet<_> = t.data.tags.iter().collect();
+
+            // Non empty intersection of tags means the task should be displayed
+            specified_tags.intersection(&task_tags).next().is_some()
+        }));
+    }
+
+    if options.no_dependencies {
+        tasks = Box::new(tasks.filter(move |t| {
+            t.data.dependencies.is_empty()
+        }));
+    }
+
+    if options.no_dependents {
+        let tasks_with_dependents = state.data.deps.get_tasks_with_dependents();
+
+        tasks = Box::new(tasks.filter(move |t| {
+            !tasks_with_dependents.contains(&t.data.id)
+        }));
     }
 
     let mut tasks : Vec<Task> = tasks.collect();
 
 
-    // Sort the tasks
-    use super::{SortBy, SortType};
-    match options.sort_by {
-        SortBy::Id => {
-            match options.sort_type {
-                SortType::Asc => {
+    // Sort the tasks.
+    use super::{OrderBy, Order};
+    match options.order_by {
+        OrderBy::Id => {
+            match options.order {
+                Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.id.cmp(&t2.data.id));
                 },
-                SortType::Desc => {
+                Order::Desc => {
                     tasks.sort_by(|t1, t2| t2.data.id.cmp(&t1.data.id));
                 },
             }
         },
-        SortBy::Name => {
-            match options.sort_type {
-                SortType::Asc => {
+        OrderBy::Name => {
+            match options.order {
+                Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.name.cmp(&t2.data.name));
                 },
-                SortType::Desc => {
+                Order::Desc => {
                     tasks.sort_by(|t1, t2| t2.data.name.cmp(&t1.data.name));
                 },
             }
         },
-        SortBy::Due => {
-            match options.sort_type {
-                SortType::Asc => {
-                    tasks.sort_by(|t1, t2| t1.data.due.cmp(&t2.data.due));
+        OrderBy::Due => {
+            match options.order {
+                Order::Asc => {
+                    tasks.sort_by(|t1, t2| compare_due_dates(&t1.data.due, &t2.data.due));
                 },
-                SortType::Desc => {
-                    tasks.sort_by(|t1, t2| t2.data.due.cmp(&t1.data.due));
+                Order::Desc => {
+                    tasks.sort_by(|t1, t2| compare_due_dates(&t2.data.due, &t1.data.due));
                 },
             }
         },
-        SortBy::Priority => {
-            match options.sort_type {
-                SortType::Asc => {
+        OrderBy::Priority => {
+            match options.order {
+                Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.priority.cmp(&t2.data.priority));
                 },
-                SortType::Desc => {
+                Order::Desc => {
                     tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
                 },
             }
         },
-        SortBy::Created => {
-            match options.sort_type {
-                SortType::Asc => {
+        OrderBy::Created => {
+            match options.order {
+                Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.created.cmp(&t2.data.created));
                 },
-                SortType::Desc => {
+                Order::Desc => {
                     tasks.sort_by(|t1, t2| t2.data.created.cmp(&t1.data.created));
                 },
             }
         },
+        OrderBy::Tracked => {
+            match options.order {
+                Order::Asc => {
+                    tasks.sort_by(|t1, t2| TimeEntry::total(&t1.data.time_entries).cmp(&TimeEntry::total(&t2.data.time_entries)));
+                },
+                Order::Desc => {
+                    tasks.sort_by(|t1, t2| TimeEntry::total(&t2.data.time_entries).cmp(&TimeEntry::total(&t1.data.time_entries)));
+                },
+            }
+        }
     }
 
     // Include the required columns
-    let mut headers = vec!["Id"];
+    let mut headers = vec!["Id", "Name"];
 
-    if options.name { headers.push("Name") };
-    if options.tracked { headers.push("Tracked") };
-    if options.due { headers.push("Due") };
-    if options.tags { headers.push("Tags") };
-    if options.priority { headers.push("Priority") };
-    if options.status { headers.push("Status") };
-    if options.created { headers.push("Created") };
+    // Remove duplicate columns.
+    {
+        let mut columns = HashSet::new();
+
+        options.column = options.column
+            .into_iter()
+            .filter(|c| {
+                if columns.contains(c) {
+                    false
+                }
+                else {
+                    columns.insert(c.clone());
+                    true
+                }
+            })
+            .collect();
+    }
+    
+    use super::Column;
+    for column in &options.column {
+        match column {
+            Column::Tracked => {
+                headers.push("Tracked");
+            },
+            Column::Due => {
+                headers.push("Due");
+            },
+            Column::Tags => {
+                headers.push("Tags");
+            },
+            Column::Priority => {
+                headers.push("Priority");
+            },
+            Column::Status => {
+                headers.push("Status");
+            },
+            Column::Created => {
+                headers.push("Created");
+            },
+        }
+    }
 
     table.set_header(headers);
 
     for task in tasks {
 
-        let mut row = vec![task.data.id.to_string()];
+        let mut row = vec![task.data.id.to_string(), task.data.name.clone()];
 
-        if options.name { row.push(task.data.name); }
-        if options.tracked {
-            let duration = TimeEntry::total(&task.data.time_entries);
-            row.push(
-                if duration == Duration::zero() { String::new() } else { duration.to_string() }
-            );
-        }
-        if options.due {
-            row.push(match task.data.due {
-                Some(due) => format_due_date(&due, task.data.completed.is_none(), false),
-                None => String::new()
-            });
-        }
-        if options.tags { row.push(format_hash_set(&task.data.tags)?); }
-        if options.priority { row.push(task.data.priority.to_string()); }
-        if options.status { 
-            row.push(
-                if task.data.completed.is_some() {
-                    String::from("complete")
-                }
-                else {
-                    String::from("incomplete")
-                }
-            );
-        }
-        if options.created { 
-            row.push(task.data.created.round_subsecs(0).to_string());
+        for column in &options.column {
+            match column {
+                Column::Tracked => {
+                    let duration = TimeEntry::total(&task.data.time_entries);
+                    row.push(
+                        if duration == Duration::zero() { String::new() } else { duration.to_string() }
+                    );
+                },
+                Column::Due => {
+                    row.push(match task.data.due {
+                        Some(due) => format_due_date(&due, task.data.completed.is_none(), false),
+                        None => String::new()
+                    });
+                },
+                Column::Tags => {
+                    row.push(format_hash_set(&task.data.tags)?);
+                },
+                Column::Priority => {
+                    row.push(task.data.priority.to_string());
+                },
+                Column::Status => {
+                    row.push(
+                        if task.data.completed.is_some() {
+                            String::from("complete")
+                        }
+                        else {
+                            String::from("incomplete")
+                        }
+                    );
+                },
+                Column::Created => {
+                    row.push(task.data.created.round_subsecs(0).to_string());
+                },
+            }
         }
 
         table.add_row(row);
@@ -651,9 +718,7 @@ impl TimeEntry {
         .map(|e| e.duration)
         .fold(Duration::zero(), |a, d| a + d)
     }
-}
 
-impl TimeEntry {
     pub fn new(hours : u16, minutes : u16) -> Self {
 
         let (hours, minutes) = {

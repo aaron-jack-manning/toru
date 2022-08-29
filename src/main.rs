@@ -101,82 +101,68 @@ enum Command {
 
 #[derive(clap::StructOpt, Debug, PartialEq, Eq)]
 pub struct ListOptions {
-    /// Include name column.
-    #[clap(long)]
-    name : bool,
-    /// Include tracked time column.
-    #[clap(long)]
-    tracked : bool,
-    /// Include due date column.
-    #[clap(long)]
-    due : bool,
-    /// Include tags column.
-    #[clap(long)]
-    tags : bool,
-    /// Include priority column.
-    #[clap(long)]
-    priority : bool,
-    /// Include status column.
-    #[clap(long)]
-    status : bool,
-    /// Include created date column.
-    #[clap(long)]
-    created : bool,
-    /// The field to sort by.
-    #[clap(long, value_enum, default_value_t=SortBy::Id)]
-    sort_by : SortBy,
+    /// Which columns to include.
+    #[clap(short, value_enum)]
+    column : Vec<Column>,
+    /// Field to order by.
+    #[clap(long, value_enum, default_value_t=OrderBy::Id)]
+    order_by : OrderBy,
     /// Sort ascending on descending.
-    #[clap(long, value_enum, default_value_t=SortType::Asc)]
-    sort_type : SortType,
-    /// Only include tasks created before a certain date.
+    #[clap(long, value_enum, default_value_t=Order::Asc)]
+    order : Order,
+    /// Tags to include.
+    #[clap(short, long)]
+    tag : Vec<String>,
+    /// Only include tasks due before a certain date (inclusive).
     #[clap(long)]
-    before : Option<chrono::NaiveDateTime>,
-    /// Only include tasks created after a certain date.
+    due_before : Option<chrono::NaiveDate>,
+    /// Only include tasks due after a certain date (inclusive).
     #[clap(long)]
-    after : Option<chrono::NaiveDateTime>,
-    /// Only include tasks due within a certain number of days.
+    due_after : Option<chrono::NaiveDate>,
+    /// Only include tasks created before a certain date (inclusive).
     #[clap(long)]
-    due_in : Option<u16>,
+    created_before : Option<chrono::NaiveDate>,
+    /// Only include tasks created after a certain date (inclusive).
+    #[clap(long)]
+    created_after : Option<chrono::NaiveDate>,
     /// Include completed tasks in the list.
     #[clap(long)]
     include_completed : bool,
-}
-
-impl Default for ListOptions {
-    fn default() -> Self {
-        Self {
-            name : true,
-            tracked : true,
-            due : true,
-            tags : true,
-            priority : true,
-            status : false,
-            created : false,
-            sort_by : SortBy::Created,
-            sort_type : SortType::Desc,
-            before : None,
-            after : None,
-            due_in : None,
-            include_completed : false,
-        }
-    }
+    /// Only include notes with no dependencies [alias: bottom-level].
+    #[clap(long, alias="bottom-level")]
+    no_dependencies : bool,
+    /// Only include notes with no dependents [alias: top-level].
+    #[clap(long, alias="top-level")]
+    no_dependents : bool,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
-pub enum SortType {
+pub enum Order {
     #[default]
     Asc,
     Desc,
 }
 
+#[derive(Default, Hash, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+pub enum Column {
+    #[default]
+    Due,
+    Priority,
+    Created,
+    Tags,
+    Status,
+    Tracked,
+}
+
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
-pub enum SortBy {
+pub enum OrderBy {
     #[default]
     Id,
     Name,
     Due,
     Priority,
     Created,
+    Tracked,
 }
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]
@@ -373,7 +359,7 @@ fn program() -> Result<(), error::Error> {
                 println!("Marked task {} as complete", colour::id(id));
             },
             List { options } => {
-                tasks::list(options, vault_folder)?;
+                tasks::list(options, vault_folder, &state)?;
             },
             // All commands which are dealt with in if let chain at start.
             Vault(_) | Config(_) | Git { args : _ } | Svn { args : _ } | Switch { name : _ } | GitIgnore => unreachable!(),
