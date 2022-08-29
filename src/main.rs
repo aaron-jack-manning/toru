@@ -242,26 +242,26 @@ fn program() -> Result<(), error::Error> {
         match command {
             New { name, path } => {
                 vault::new(name.clone(), path, &mut config)?;
-                println!("Created vault {}", colour::vault(&name));
+                println!("Created vault {}", colour::text::vault(&name));
             },
             Disconnect { name } => {
                 vault::disconnect(&name, &mut config)?;
-                println!("Disconnected vault {}", colour::vault(&name));
+                println!("Disconnected vault {}", colour::text::vault(&name));
             },
             Connect { name , path } => {
                 vault::connect(name.clone(), path, &mut config)?;
-                println!("Connected vault {}", colour::vault(&name));
+                println!("Connected vault {}", colour::text::vault(&name));
             },
             Delete { name } => {
                 vault::delete(&name, &mut config)?;
-                println!("Deleted vault {}", colour::vault(&name));
+                println!("Deleted vault {}", colour::text::vault(&name));
             },
             List => {
                 config.list_vaults()?;
             },
             Rename { old_name, new_name } => {
                 config.rename_vault(&old_name, new_name.clone())?;
-                println!("Renamed vault {} to {}", colour::vault(&old_name), colour::vault(&new_name));
+                println!("Renamed vault {} to {}", colour::text::vault(&old_name), colour::text::vault(&new_name));
             }
         }
     }
@@ -283,7 +283,7 @@ fn program() -> Result<(), error::Error> {
     }
     else if let Switch { name } = command {
         config.switch(&name)?;
-        println!("Switched to vault {}", colour::vault(&name));
+        println!("Switched to vault {}", colour::text::vault(&name));
     }
     else if let Git { args } = command {
         let vault_folder = &config.current_vault()?.1;
@@ -292,7 +292,7 @@ fn program() -> Result<(), error::Error> {
     else if command == GitIgnore {
         let vault_folder = &config.current_vault()?.1;
         vcs::create_gitignore(vault_folder)?;
-        println!("Default {} file created", colour::file(".gitignore"));
+        println!("Default {} file created", colour::text::file(".gitignore"));
     }
     else if let Svn { args } = command {
         let vault_folder = &config.current_vault()?.1;
@@ -306,7 +306,7 @@ fn program() -> Result<(), error::Error> {
         match command {
             New { name, info, tags, dependencies, priority, due } => {
                 let task = tasks::Task::new(name, info, tags, dependencies, priority, due, vault_folder, &mut state)?;
-                println!("Created task {} (ID: {})", colour::task_name(&task.data.name), colour::id(task.data.id));
+                println!("Created task {} (ID: {})", colour::text::task(&task.data.name), colour::text::id(task.data.id));
             },
             Delete { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;
@@ -316,7 +316,7 @@ fn program() -> Result<(), error::Error> {
                 state.data.deps.remove_node(task.data.id);
                 task.delete()?;
 
-                println!("Deleted task {} (ID: {})", colour::task_name(&name), colour::id(id));
+                println!("Deleted task {} (ID: {})", colour::text::task(&name), colour::text::id(id));
             },
             View { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;
@@ -331,7 +331,7 @@ fn program() -> Result<(), error::Error> {
                 else {
                     edit::edit_raw(id, vault_folder.clone(), &config.editor, &mut state)?;
                 }
-                println!("Updated task {}", colour::id(id));
+                println!("Updated task {}", colour::text::id(id));
             },
             Track { id_or_name, hours, minutes } => {
                 let id = state.data.index.lookup(&id_or_name)?;
@@ -356,7 +356,7 @@ fn program() -> Result<(), error::Error> {
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
                 task.data.completed = Some(chrono::Local::now().naive_local());
                 task.save()?;
-                println!("Marked task {} as complete", colour::id(id));
+                println!("Marked task {} as complete", colour::text::id(id));
             },
             List { options } => {
                 tasks::list(options, vault_folder, &state)?;

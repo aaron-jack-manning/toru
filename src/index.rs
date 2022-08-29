@@ -69,7 +69,7 @@ impl Index {
                         else {
                             let coloured_ids : Vec<_> =
                                 ids.iter()
-                                .map(|i| colour::id(*i))
+                                .map(|i| colour::text::id(*i))
                                 .collect();
 
                             let mut display_ids = String::new();
@@ -86,7 +86,7 @@ impl Index {
                             Err(error::Error::Generic(format!("Multiple notes (Ids: [{}]) by that name exist", display_ids)))
                         }
                     },
-                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::task_name(name)))),
+                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::text::task(name)))),
                 }
             }
         }

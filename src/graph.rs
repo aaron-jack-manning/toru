@@ -40,7 +40,7 @@ impl Graph {
             Err(error::Error::Internal(String::from("Attempt to insert an edge in the dependency graph with a node which wasn't present")))
         }
         else if first == second {
-            Err(error::Error::Generic(format!("Note with ID {} cannot depend on itself", colour::id(first))))
+            Err(error::Error::Generic(format!("Note with ID {} cannot depend on itself", colour::text::id(first))))
         }
         else {
             let outgoing = self.edges.get_mut(&first).unwrap();
@@ -136,7 +136,7 @@ pub fn format_cycle(cycle : &Vec<Id>) -> String {
     let mut formatted = String::new();
 
     for (index, node) in cycle.iter().enumerate() {
-        write!(&mut formatted, "{}", colour::id(*node)).unwrap();
+        write!(&mut formatted, "{}", colour::text::id(*node)).unwrap();
 
         if index != cycle.len() - 1 {
             formatted.push_str(" -> ");

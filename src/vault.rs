@@ -68,10 +68,10 @@ pub fn connect(name : String, path : path::PathBuf, config : &mut config::Config
         if path.exists() && path.is_dir()  {
             // Vault is missing required metadata files.
             if !path.join("notes").exists() {
-                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} folder", colour::file("notes"))))
+                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} folder", colour::text::file("notes"))))
             }
             else if !path.join("state.toml").exists() {
-                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} file", colour::file("state.toml"))))
+                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} file", colour::text::file("state.toml"))))
             }
             // Required metadata exists, so the vault is connected.
             else {

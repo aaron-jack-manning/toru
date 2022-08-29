@@ -89,7 +89,7 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
                         state.data.deps.insert_edge(id, *dependency)?;
                     }
                     else {
-                        return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::id(*dependency))));
+                        return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::text::id(*dependency))));
                     }
                 }
 

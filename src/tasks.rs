@@ -12,7 +12,6 @@ use std::cmp;
 use std::path;
 use std::io::{Write, Seek};
 use std::collections::{HashSet, HashMap};
-use colored::Colorize;
 use chrono::SubsecRound;
 
 pub type Id = u64;
@@ -43,17 +42,6 @@ impl fmt::Display for Priority {
     }
 }
 
-impl Priority {
-    pub fn coloured(&self) -> String {
-        use Priority::*;
-        let priority = match self {
-            Low => "low".truecolor(46, 204, 113),
-            Medium => "medium".truecolor(241, 196, 15),
-            High => "high".truecolor(231, 76, 60),
-        };
-        format!("{}", priority)
-    }
-}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
@@ -109,7 +97,7 @@ impl Task {
                     state.data.deps.insert_edge(id, *dependency)?;
                 }
                 else {
-                    return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::id(*dependency))));
+                    return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::text::id(*dependency))));
                 }
             }
         }
@@ -214,7 +202,7 @@ impl Task {
             Ok(path)
         }
         else {
-            Err(error::Error::Generic(format!("No task with the ID {} exists", colour::id(id))))
+            Err(error::Error::Generic(format!("No task with the ID {} exists", colour::text::id(id))))
         }
     }
 
@@ -262,7 +250,7 @@ impl Task {
         let (heading, heading_length) = {
 
             (
-                format!("[{}] {} {}", if self.data.completed.is_some() {"X"} else {" "}, colour::id(self.data.id), colour::task_name(&self.data.name)),
+                format!("[{}] {} {}", if self.data.completed.is_some() {"X"} else {" "}, colour::text::id(self.data.id), colour::text::task(&self.data.name)),
                 5 + self.data.name.chars().count() + self.data.id.to_string().chars().count()
             )
         };
@@ -270,12 +258,12 @@ impl Task {
         println!("{}", heading);
         line(heading_length);
 
-        println!("Priority:     {}", self.data.priority.coloured());
+        println!("Priority:     {}", colour::text::priority(&self.data.priority));
         println!("Tags:         [{}]", format_hash_set(&self.data.tags)?);
         println!("Created:      {}", self.data.created.round_subsecs(0));
         
         if let Some(due) = self.data.due {
-            let due = format_due_date(&due, self.data.completed.is_none(), true);
+            let due = colour::text::due_date(&due, self.data.completed.is_none(), true);
             println!("Due:          {}", due);
         }
 
@@ -347,17 +335,17 @@ fn dependency_tree(start : Id, prefix : &String, is_last_item : bool, graph : &g
         let task = tasks.get(&start).unwrap();
 
         let name = if task.data.completed.is_some() {
-            colour::greyed_out(&task.data.name)
+            colour::text::greyed_out(&task.data.name)
         }
         else {
-            colour::task_name(&task.data.name)
+            colour::text::task(&task.data.name)
         };
 
         if is_last_item {
-            println!("{}└──{} (ID: {})", prefix, name, colour::id(start))
+            println!("{}└──{} (ID: {})", prefix, name, colour::text::id(start))
         }
         else {
-            println!("{}├──{} (ID: {})", prefix, name, colour::id(start))
+            println!("{}├──{} (ID: {})", prefix, name, colour::text::id(start))
         }
     }
 
@@ -377,56 +365,6 @@ fn dependency_tree(start : Id, prefix : &String, is_last_item : bool, graph : &g
     }
 }
 
-fn format_due_date(due : &chrono::NaiveDateTime, include_fuzzy_period : bool, colour : bool) -> String {
-    let remaining = *due - chrono::Local::now().naive_local();
-
-    let fuzzy_period = if remaining.num_days() != 0 {
-        let days = remaining.num_days().abs();
-        format!("{} day{}", days, if days == 1 {""} else {"s"})
-    }
-    else if remaining.num_hours() != 0 {
-        let hours = remaining.num_hours().abs();
-        format!("{} hour{}", hours, if hours == 1 {""} else {"s"})
-    }
-    else if remaining.num_minutes() != 0 {
-        let minutes = remaining.num_minutes().abs();
-        format!("{} minute{}", minutes, if minutes == 1 {""} else {"s"})
-    }
-    else {
-        let seconds = remaining.num_seconds().abs();
-        format!("{} second{}", seconds, if seconds == 1 {""} else {"s"})
-    };
-
-    if include_fuzzy_period {
-        if colour {
-            if remaining < chrono::Duration::zero() {
-                format!("{} {}", due.round_subsecs(0), colour::due_date::overdue(&format!("({} overdue)", fuzzy_period)))
-            }
-            else if remaining < chrono::Duration::days(1) {
-                format!("{} {}", due.round_subsecs(0), colour::due_date::very_close(&format!("({} remaining)", fuzzy_period)))
-
-            }
-            else if remaining < chrono::Duration::days(3) {
-                format!("{} {}", due.round_subsecs(0), colour::due_date::close(&format!("({} remaining)", fuzzy_period)))
-
-            }
-            else {
-                format!("{} {}", due.round_subsecs(0), colour::due_date::plenty_of_time(&format!("({} remaining)", fuzzy_period)))
-            }
-        }
-        else {
-            if remaining < chrono::Duration::zero() {
-                format!("{} ({} overdue)", due.round_subsecs(0), fuzzy_period)
-            }
-            else {
-                format!("{} ({} remaining)", due.round_subsecs(0), fuzzy_period)
-            }
-        }
-    }
-    else {
-        format!("{}", due.round_subsecs(0))
-    }
-}
 
 fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::Ordering {
     match (first, second) {
@@ -621,40 +559,41 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
 
     for task in tasks {
 
-        let mut row = vec![task.data.id.to_string(), task.data.name.clone()];
+        use comfy_table::Cell;
+        let mut row = vec![Cell::from(task.data.id), Cell::from(task.data.name)];
 
         for column in &options.column {
             match column {
                 Column::Tracked => {
                     let duration = TimeEntry::total(&task.data.time_entries);
                     row.push(
-                        if duration == Duration::zero() { String::new() } else { duration.to_string() }
+                        Cell::from(if duration == Duration::zero() { String::new() } else { duration.to_string() })
                     );
                 },
                 Column::Due => {
                     row.push(match task.data.due {
-                        Some(due) => format_due_date(&due, task.data.completed.is_none(), false),
-                        None => String::new()
+                        Some(due) => colour::cell::due_date(&due, task.data.completed.is_none(), true),
+                        None => Cell::from(String::new())
                     });
                 },
                 Column::Tags => {
-                    row.push(format_hash_set(&task.data.tags)?);
+                    row.push(Cell::new(format_hash_set(&task.data.tags)?));
                 },
                 Column::Priority => {
-                    row.push(task.data.priority.to_string());
+                    row.push(colour::cell::priority(&task.data.priority));
                 },
                 Column::Status => {
                     row.push(
-                        if task.data.completed.is_some() {
+                        Cell::new(if task.data.completed.is_some() {
                             String::from("complete")
                         }
                         else {
                             String::from("incomplete")
-                        }
+                        })
                     );
                 },
                 Column::Created => {
-                    row.push(task.data.created.round_subsecs(0).to_string());
+                    row.push(Cell::new(task.data.created.round_subsecs(0).to_string()));
                 },
             }
         }

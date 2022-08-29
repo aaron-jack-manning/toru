@@ -20,15 +20,15 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Confy(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Trash(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::TomlDe(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::TomlSer(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Utf8(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Fmt(err) => write!(f, "{} {}", colour::error("Internal Error:"), err),
-            Error::Generic(message) => write!(f, "{} {}", colour::error("Error:"), message),
-            Error::Internal(message) => write!(f, "{} {}", colour::error("Internal Error:"), message),
+            Error::Io(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::Confy(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::Trash(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::TomlDe(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::TomlSer(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::Utf8(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::Fmt(err) => write!(f, "{} {}", colour::text::error("Internal Error:"), err),
+            Error::Generic(message) => write!(f, "{} {}", colour::text::error("Error:"), message),
+            Error::Internal(message) => write!(f, "{} {}", colour::text::error("Internal Error:"), message),
         }
     }
 }
