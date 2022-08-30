@@ -83,6 +83,12 @@ enum Command {
         hours : u16,
         #[clap(short='M', default_value_t=0)]
         minutes : u16,
+        /// Date for the time entry [default: Today]
+        #[clap(short, long)]
+        date : Option<chrono::NaiveDate>,
+        /// Message to identify the time entry.
+        #[clap(short, long)]
+        message : Option<String>,
     },
     /// For statistics about the state of your vault.
     #[clap(subcommand)]
@@ -333,10 +339,10 @@ fn program() -> Result<(), error::Error> {
                 }
                 println!("Updated task {}", colour::text::id(id));
             },
-            Track { id_or_name, hours, minutes } => {
+            Track { id_or_name, hours, minutes, date, message } => {
                 let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
-                let entry =  tasks::TimeEntry::new(hours, minutes);
+                let entry =  tasks::TimeEntry::new(hours, minutes, date, message);
                 task.data.time_entries.push(entry);
                 task.save()?;
             },

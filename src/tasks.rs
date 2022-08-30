@@ -46,6 +46,7 @@ impl fmt::Display for Priority {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
     pub logged_date : chrono::NaiveDate,
+    pub message : Option<String>,
     pub duration : Duration,
 }
 
@@ -291,7 +292,12 @@ impl Task {
             let mut total = Duration::zero();
             let mut lines = Vec::with_capacity(entries.len());
             for entry in &entries {
-                lines.push(format!("    {} [{}]", entry.duration, entry.logged_date));
+                lines.push(format!(
+                    "    {} [{}] {}",
+                    entry.duration,
+                    entry.logged_date,
+                    entry.message.as_ref().unwrap_or(&String::new())
+                ));
                 total = total + entry.duration;
             }
 
@@ -658,14 +664,16 @@ impl TimeEntry {
         .fold(Duration::zero(), |a, d| a + d)
     }
 
-    pub fn new(hours : u16, minutes : u16) -> Self {
+    /// Creates a new TimeEntry, correctly validating and setting defaults.
+    pub fn new(hours : u16, minutes : u16, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
 
         let (hours, minutes) = {
             (hours + minutes / 60, minutes % 60)
         };
 
         Self {
-            logged_date : chrono::Utc::now().naive_local().date(),
+            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
+            message,
             duration : Duration {
                 hours,
                 minutes,
