@@ -29,3 +29,15 @@ pub fn command(args : Vec<String>, vcs : Vcs, vault_folder : &path::Path) -> Res
 pub fn create_gitignore(vault_folder : &path::Path) -> Result<(), error::Error> {
     Ok(fs::write(vault_folder.join(".gitignore"), "state.toml\ntemp.toml\ntemp.md")?)
 }
+
+pub fn set_svn_ignore(vault_folder : &path::Path) -> Result<(), error::Error> {
+
+    let mut child = process::Command::new("svn")
+        .current_dir(vault_folder)
+        .args(&["propset", "svn:ignore", "state.toml\ntemp.toml\ntemp.md", "."])
+        .spawn()?;
+
+    let _ = child.wait()?;
+
+    Ok(())
+}

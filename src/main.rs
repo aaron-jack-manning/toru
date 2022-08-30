@@ -83,14 +83,19 @@ fn program() -> Result<(), error::Error> {
         let vault_folder = &config.current_vault()?.1;
         vcs::command(args, vcs::Vcs::Git, vault_folder)?;
     }
+    else if let Command::Svn { args } = command {
+        let vault_folder = &config.current_vault()?.1;
+        vcs::command(args, vcs::Vcs::Svn, vault_folder)?;
+    }
     else if command == Command::GitIgnore {
         let vault_folder = &config.current_vault()?.1;
         vcs::create_gitignore(vault_folder)?;
         println!("Default {} file created", format::file(".gitignore"));
     }
-    else if let Command::Svn { args } = command {
+    else if command == Command::SvnIgnore {
         let vault_folder = &config.current_vault()?.1;
-        vcs::command(args, vcs::Vcs::Svn, vault_folder)?;
+        vcs::set_svn_ignore(vault_folder)?;
+        println!("Default svn:ignore property set");
     }
     // Commands that require loading in the state.
     else {
@@ -156,7 +161,7 @@ fn program() -> Result<(), error::Error> {
                 tasks::list(options, vault_folder, &state)?;
             },
             // All commands which are dealt with in if let chain at start.
-            Command::Vault(_) | Command::Config(_) | Command::Git { args : _ } | Command::Svn { args : _ } | Command::Switch { name : _ } | Command::GitIgnore => unreachable!(),
+            Command::Vault(_) | Command::Config(_) | Command::Git { args : _ } | Command::Svn { args : _ } | Command::Switch { name : _ } | Command::GitIgnore | Command::SvnIgnore => unreachable!(),
         }
 
         state.save()?;

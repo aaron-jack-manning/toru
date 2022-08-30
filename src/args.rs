@@ -72,6 +72,9 @@ pub enum Command {
         #[clap(flatten)]
         options : ListOptions,
     },
+    /// Adds the recommended svn:ignore property to the top level of the vault.
+    #[clap(name="svn:ignore")]
+    SvnIgnore,
     /// For tracking time against a task.
     Track {
         id_or_name : String,
