@@ -7,7 +7,7 @@ use crate::tasks;
 use crate::error;
 use crate::graph;
 use crate::state;
-use crate::colour;
+use crate::format;
 use crate::tasks::Id;
 
 pub fn open_editor(path : &path::Path, editor : &str) -> Result<process::ExitStatus, error::Error> {
@@ -75,9 +75,18 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
     else {
         let mut edited_task = tasks::Task::load_direct(temp_path.clone(), true)?;
 
+        // Enforce time entry duration invariant.
+        for entry in &edited_task.data.time_entries {
+            if !entry.duration.satisfies_invariant() {
+                return Err(error::Error::Generic(String::from("Task duration must not have a number of minutes greater than 60")))
+            }
+        }
+
+        // Make sure ID is not changed.
         if edited_task.data.id != task.data.id {
             Err(error::Error::Generic(String::from("You cannot change the ID of a task in a direct edit")))
         }
+        // Enforce non numeric name invariant.
         else if edited_task.data.name.chars().all(|c| c.is_numeric()) {
             Err(error::Error::Generic(String::from("Name must not be purely numeric")))
         }
@@ -93,7 +102,7 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
                         state.data.deps.insert_edge(id, *dependency)?;
                     }
                     else {
-                        return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::text::id(*dependency))));
+                        return Err(error::Error::Generic(format!("No task with an ID of {} exists", format::id(*dependency))));
                     }
                 }
 

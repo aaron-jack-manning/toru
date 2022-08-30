@@ -1,6 +1,5 @@
 use crate::error;
-
-use crate::colour;
+use crate::format;
 
 use std::path;
 
@@ -46,7 +45,7 @@ impl Config {
 
         for (name, _) in &mut self.vaults {
             if *name == new_name {
-                return Err(error::Error::Generic(format!("A vault named {} already exists", colour::text::vault(&new_name))));
+                return Err(error::Error::Generic(format!("A vault named {} already exists", format::vault(&new_name))));
             }
 
             if name == old_name {
@@ -60,7 +59,7 @@ impl Config {
                 Ok(())
             },
             None => {
-                Err(error::Error::Generic(format!("No vault named {} exists", colour::text::vault(old_name))))
+                Err(error::Error::Generic(format!("No vault named {} exists", format::vault(old_name))))
             }
         }
 
@@ -82,7 +81,7 @@ impl Config {
                 Ok(path)
             },
             None => {
-                Err(error::Error::Generic(format!("No vault by the name {} exists", colour::text::vault(name))))
+                Err(error::Error::Generic(format!("No vault by the name {} exists", format::vault(name))))
             }
         }
     }
@@ -94,7 +93,7 @@ impl Config {
                 Ok(())
             },
             None => {
-                Err(error::Error::Generic(format!("No vault by the name {} exists", colour::text::vault(name))))
+                Err(error::Error::Generic(format!("No vault by the name {} exists", format::vault(name))))
             }
         }
     }
@@ -105,7 +104,7 @@ impl Config {
         let width = self.vaults.iter().fold(usize::MIN, |c, (n, _)| c.max(n.len()));
 
         if self.vaults.is_empty() {
-            Err(error::Error::Generic(format!("No vaults currently set up, try running: {}", colour::text::command("toru vault new <NAME> <PATH>"))))
+            Err(error::Error::Generic(format!("No vaults currently set up, try running: {}", format::command("toru vault new <NAME> <PATH>"))))
         }
         else {
             for (i, (name, path)) in self.vaults.iter().enumerate() {
@@ -117,7 +116,7 @@ impl Config {
                     print!("  ");
                 }
 
-                print!("{}", colour::text::vault(name));
+                print!("{}", format::vault(name));
 
                 let padding = width - name.len() + 1;
 

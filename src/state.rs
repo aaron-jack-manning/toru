@@ -23,7 +23,7 @@ pub struct InternalState {
 }
 
 impl State {
-    /// This function should be called after creating or checking that the "notes" folder exists.
+    /// This function should be called after creating or checking that the "tasks" folder exists.
     pub fn load(vault_location : &path::Path) -> Result<Self, error::Error> {
         let path = vault_location.join("state.toml");
 
@@ -47,7 +47,7 @@ impl State {
 
             // Calculating the next ID if necessary.
             let mut max_id : i128 = -1;
-            for id in vault_location.join("notes").read_dir()?.filter_map(|p| p.ok()).map(|p| p.path()).filter(|p| p.extension().map(|s| s.to_str()) == Some(Some("toml"))).filter_map(|p| p.file_stem().map(|x| x.to_str().map(|y| y.to_string()))).flatten().filter_map(|p| p.parse::<Id>().ok()) {
+            for id in vault_location.join("tasks").read_dir()?.filter_map(|p| p.ok()).map(|p| p.path()).filter(|p| p.extension().map(|s| s.to_str()) == Some(Some("toml"))).filter_map(|p| p.file_stem().map(|x| x.to_str().map(|y| y.to_string()))).flatten().filter_map(|p| p.parse::<Id>().ok()) {
 
                 if i128::try_from(id).unwrap() > max_id {
                     max_id = i128::from(id);

@@ -1,6 +1,6 @@
 use crate::error;
 use crate::state;
-use crate::colour;
+use crate::format;
 use crate::config;
 
 use std::fs;
@@ -9,7 +9,7 @@ use std::path;
 pub fn new(name : String, path : path::PathBuf, config : &mut config::Config) -> Result<(), error::Error> {
 
     fn create_all_metadata(path : &path::Path) -> Result<(), error::Error> {
-        fs::create_dir(path.join("notes"))?;
+        fs::create_dir(path.join("tasks"))?;
         let _ = state::State::load(path)?;
 
         Ok(())
@@ -67,11 +67,11 @@ pub fn connect(name : String, path : path::PathBuf, config : &mut config::Config
         // Folder exists and contains data.
         if path.exists() && path.is_dir()  {
             // Vault is missing required metadata files.
-            if !path.join("notes").exists() {
-                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} folder", colour::text::file("notes"))))
+            if !path.join("tasks").exists() {
+                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} folder", format::file("tasks"))))
             }
             else if !path.join("state.toml").exists() {
-                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} file", colour::text::file("state.toml"))))
+                Err(error::Error::Generic(format!("Cannot connect the vault as it is missing the {} file", format::file("state.toml"))))
             }
             // Required metadata exists, so the vault is connected.
             else {

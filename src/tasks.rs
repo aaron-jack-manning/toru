@@ -1,7 +1,6 @@
 use crate::error;
 use crate::state;
-use crate::graph;
-use crate::colour;
+use crate::format;
 
 use std::io;
 use std::fs;
@@ -30,19 +29,6 @@ pub enum Priority {
     High,
 }
 
-impl fmt::Display for Priority {
-    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Priority::*;
-        let priority = match self {
-            Low => "low",
-            Medium => "medium",
-            High => "high",
-        };
-        write!(f, "{}", priority)
-    }
-}
-
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TimeEntry {
     pub logged_date : chrono::NaiveDate,
@@ -50,13 +36,11 @@ pub struct TimeEntry {
     pub duration : Duration,
 }
 
-// Needs to preserve representation invariant of minutes < 60
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct Duration {
     hours : u16,
     minutes : u16,
 }
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InternalTask {
@@ -76,14 +60,16 @@ impl Task {
     /// Creates a new task from the input data.
     pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, due : Option<chrono::NaiveDateTime>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
 
+        // Exclude numeric names in the interest of allowing commands that take in ID or name.
         if name.chars().all(|c| c.is_numeric()) {
             return Err(error::Error::Generic(String::from("Name must not be purely numeric")));
         };
 
+        // Update the state with the new next Id.
         let id = state.data.next_id;
         state.data.next_id += 1;
         
-        let path = vault_folder.join("notes").join(&format!("{}.toml", id));
+        let path = vault_folder.join("tasks").join(&format!("{}.toml", id));
 
         let mut file = fs::File::options()
             .write(true)
@@ -98,7 +84,7 @@ impl Task {
                     state.data.deps.insert_edge(id, *dependency)?;
                 }
                 else {
-                    return Err(error::Error::Generic(format!("No task with an ID of {} exists", colour::text::id(*dependency))));
+                    return Err(error::Error::Generic(format!("No task with an ID of {} exists", format::id(*dependency))));
                 }
             }
         }
@@ -163,7 +149,7 @@ impl Task {
 
     /// Get an iterator over the IDs of tasks in a vault.
     fn id_iter(vault_folder : &path::Path) -> impl Iterator<Item = u64> {
-        fs::read_dir(vault_folder.join("notes"))
+        fs::read_dir(vault_folder.join("tasks"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|p| p.is_file())
@@ -198,12 +184,12 @@ impl Task {
     /// Checks that a task with the prodided ID exists in the provided vault_folder. Returns the
     /// path of that task.
     pub fn check_exists(id : Id, vault_folder : &path::Path) -> Result<path::PathBuf, error::Error> {
-        let path = vault_folder.join("notes").join(format!("{}.toml", id));
+        let path = vault_folder.join("tasks").join(format!("{}.toml", id));
         if path.exists() && path.is_file() {
             Ok(path)
         }
         else {
-            Err(error::Error::Generic(format!("No task with the ID {} exists", colour::text::id(id))))
+            Err(error::Error::Generic(format!("No task with the ID {} exists", format::id(id))))
         }
     }
 
@@ -241,6 +227,7 @@ impl Task {
     /// Displays a task to the terminal.
     pub fn display(&self, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
         
+        /// Displays a line of hyphens of a specified length.
         fn line(len : usize) {
             for _ in 0..len {
                 print!("-");
@@ -248,23 +235,21 @@ impl Task {
             println!();
         }
 
-        let (heading, heading_length) = {
-
+        let (heading, heading_length) =
             (
-                format!("[{}] {} {}", if self.data.completed.is_some() {"X"} else {" "}, colour::text::id(self.data.id), colour::text::task(&self.data.name)),
+                format!("[{}] {} {}", if self.data.completed.is_some() {"X"} else {" "}, format::id(self.data.id), format::task(&self.data.name)),
                 5 + self.data.name.chars().count() + self.data.id.to_string().chars().count()
-            )
-        };
+            );
 
         println!("{}", heading);
         line(heading_length);
 
-        println!("Priority:     {}", colour::text::priority(&self.data.priority));
-        println!("Tags:         [{}]", format_hash_set(&self.data.tags)?);
+        println!("Priority:     {}", format::priority(&self.data.priority));
+        println!("Tags:         [{}]", format::hash_set(&self.data.tags)?);
         println!("Created:      {}", self.data.created.round_subsecs(0));
         
         if let Some(due) = self.data.due {
-            let due = colour::text::due_date(&due, self.data.completed.is_none(), true);
+            let due = format::due_date(&due, self.data.completed.is_none());
             println!("Due:          {}", due);
         }
 
@@ -283,10 +268,11 @@ impl Task {
             }
         }
 
+        // Display tracked time.
         if !self.data.time_entries.is_empty() {
 
             let mut entries = self.data.time_entries.clone();
-            // Sort entries by date.
+            // Sort time entries by date.
             entries.sort_by(|e1, e2| e1.logged_date.cmp(&e2.logged_date));
 
             let mut total = Duration::zero();
@@ -307,71 +293,58 @@ impl Task {
             }
         }
 
+        // Display dependencies as tree.
         if !self.data.dependencies.is_empty() {
-            let tasks = Task::load_all_as_map(vault_folder, true)?;
 
             println!("Dependencies:");
-            dependency_tree(self.data.id, &String::new(), true, &state.data.deps, &tasks);
+            format::dependencies(self.data.id, vault_folder, &state.data.deps)?;
         }
         
         Ok(())
     }
 }
 
-fn format_hash_set<T : fmt::Display>(set : &HashSet<T>) -> Result<String, error::Error> {
-    let mut output = String::new();
-
-    for value in set.iter() {
-        fmt::write(&mut output, format_args!("{}, ", value))?;
-    }
-
-    // Remove the trailing comma and space.
-    if !output.is_empty() {
-        output.pop();
-        output.pop();
-    }
-
-    Ok(output)
-}
-
-fn dependency_tree(start : Id, prefix : &String, is_last_item : bool, graph : &graph::Graph, tasks : &HashMap<Id, Task>) {
-    let next = graph.edges.get(&start).unwrap();
-
-    {
-        let task = tasks.get(&start).unwrap();
-
-        let name = if task.data.completed.is_some() {
-            colour::text::greyed_out(&task.data.name)
-        }
-        else {
-            colour::text::task(&task.data.name)
-        };
-
-        if is_last_item {
-            println!("{}└──{} (ID: {})", prefix, name, colour::text::id(start))
-        }
-        else {
-            println!("{}├──{} (ID: {})", prefix, name, colour::text::id(start))
+impl Duration {
+    pub fn zero() -> Self {
+        Self {
+            minutes : 0,
+            hours : 0,
         }
     }
 
-    let count = next.len();
-
-    for (i, node) in next.iter().enumerate() {
-        let new_is_last_item = i == count - 1;
-
-        let new_prefix = if is_last_item {
-            format!("{}   ", prefix)
-        }
-        else {
-            format!("{}│  ", prefix)
-        };
-
-        dependency_tree(*node, &new_prefix, new_is_last_item, graph, tasks);
+    pub fn satisfies_invariant(&self) -> bool {
+        self.minutes < 60
     }
 }
 
+impl TimeEntry {
+    /// Adds up the times from a collection of time entries.
+    fn total(entries : &[TimeEntry]) -> Duration {
+        entries
+        .iter()
+        .map(|e| e.duration)
+        .fold(Duration::zero(), |a, d| a + d)
+    }
 
+    /// Creates a new TimeEntry, correctly validating and setting defaults.
+    pub fn new(hours : u16, minutes : u16, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
+
+        let (hours, minutes) = {
+            (hours + minutes / 60, minutes % 60)
+        };
+
+        Self {
+            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
+            message,
+            duration : Duration {
+                hours,
+                minutes,
+            }
+        }
+    }
+}
+
+/// Compares due dates correctly, treating None as at infinity.
 fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::Ordering {
     match (first, second) {
         (None, None) => cmp::Ordering::Equal,
@@ -381,8 +354,8 @@ fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::O
     }
 }
 
+/// Lists all tasks in the specified vault.
 pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
-
 
     let mut table = comfy_table::Table::new();
     table
@@ -578,15 +551,15 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
                 },
                 Column::Due => {
                     row.push(match task.data.due {
-                        Some(due) => colour::cell::due_date(&due, task.data.completed.is_none(), true),
+                        Some(due) => format::cell::due_date(&due, task.data.completed.is_none()),
                         None => Cell::from(String::new())
                     });
                 },
                 Column::Tags => {
-                    row.push(Cell::new(format_hash_set(&task.data.tags)?));
+                    row.push(Cell::new(format::hash_set(&task.data.tags)?));
                 },
                 Column::Priority => {
-                    row.push(colour::cell::priority(&task.data.priority));
+                    row.push(format::cell::priority(&task.data.priority));
                 },
                 Column::Status => {
                     row.push(
@@ -624,16 +597,6 @@ impl ops::Add for Duration {
     }
 }
 
-impl Duration {
-    pub fn zero() -> Self {
-        Self {
-            minutes : 0,
-            hours : 0,
-        }
-    }
-}
-
-
 impl ops::Div<usize> for Duration {
     type Output = Self;
 
@@ -655,31 +618,15 @@ impl fmt::Display for Duration {
     }
 }
 
-impl TimeEntry {
-    /// Adds up the times from a collection of time entries.
-    fn total(entries : &[TimeEntry]) -> Duration {
-        entries
-        .iter()
-        .map(|e| e.duration)
-        .fold(Duration::zero(), |a, d| a + d)
-    }
-
-    /// Creates a new TimeEntry, correctly validating and setting defaults.
-    pub fn new(hours : u16, minutes : u16, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
-
-        let (hours, minutes) = {
-            (hours + minutes / 60, minutes % 60)
+impl fmt::Display for Priority {
+    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Priority::*;
+        let priority = match self {
+            Low => "low",
+            Medium => "medium",
+            High => "high",
         };
-
-        Self {
-            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
-            message,
-            duration : Duration {
-                hours,
-                minutes,
-            }
-        }
+        write!(f, "{}", priority)
     }
 }
-
 

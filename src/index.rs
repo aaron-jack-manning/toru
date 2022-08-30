@@ -1,6 +1,6 @@
 use crate::tasks;
 use crate::error;
-use crate::colour;
+use crate::format;
 use crate::tasks::Id;
 
 use std::fmt::Write;
@@ -69,7 +69,7 @@ impl Index {
                         else {
                             let coloured_ids : Vec<_> =
                                 ids.iter()
-                                .map(|i| colour::text::id(*i))
+                                .map(|i| format::id(*i))
                                 .collect();
 
                             let mut display_ids = String::new();
@@ -83,10 +83,10 @@ impl Index {
                                 display_ids.pop();
                             }
 
-                            Err(error::Error::Generic(format!("Multiple notes (Ids: [{}]) by that name exist", display_ids)))
+                            Err(error::Error::Generic(format!("Multiple tasks (Ids: [{}]) by that name exist", display_ids)))
                         }
                     },
-                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", colour::text::task(name)))),
+                    None => Err(error::Error::Generic(format!("A note by the name {} does not exist", format::task(name)))),
                 }
             }
         }
