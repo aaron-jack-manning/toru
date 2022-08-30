@@ -39,7 +39,8 @@ pub fn edit_info(id : Id, vault_folder : path::PathBuf, editor : &str) -> Result
     else {
         let file_contents = fs::read_to_string(&temp_path)?;
 
-        task.data.info = if file_contents.is_empty() {
+        // Check if the remaining file is just whitespace, so the info will become None
+        task.data.info = if file_contents.trim().is_empty() {
             None
         }
         else {
@@ -47,6 +48,9 @@ pub fn edit_info(id : Id, vault_folder : path::PathBuf, editor : &str) -> Result
         };
         
         task.save()?;
+
+        // Remove the temporary file
+        fs::remove_file(&temp_path)?;
 
         Ok(())
     }
@@ -108,7 +112,7 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
 
             task.save()?;
 
-            trash::delete(&temp_path)?;
+            fs::remove_file(&temp_path)?;
 
             Ok(())
         }
