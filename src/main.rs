@@ -30,9 +30,9 @@ enum Command {
         #[clap(short, long)]
         info : Option<String>,
         #[clap(short, long)]
-        tags : Vec<String>,
+        tag : Vec<String>,
         #[clap(short, long)]
-        dependencies : Vec<Id>,
+        dependency : Vec<Id>,
         #[clap(short, long, value_enum)]
         priority : Option<tasks::Priority>,
         /// Due date, expecting format yyyy-mm-ddThh:mm:ss
