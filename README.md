@@ -73,3 +73,10 @@ To start up you will need a vault to store tasks in, which you can create by run
 If you ever want to view all vaults, along with which is the current one, run `toru vault list`.
 
 Then you can run `toru new` to create your first task.
+
+---
+
+## Planned Changes
+
+- Validate invariants at the point of saving, to create consistency across creating and editing notes.
+- Convenient options with the edit command so that editing the raw file isn't the only option
