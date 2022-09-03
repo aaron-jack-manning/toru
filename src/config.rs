@@ -5,6 +5,7 @@ use crate::format;
 use std::path;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct Config {
     /// Paths for all vaults, ordered according to recent usage, with current at the front.
     pub vaults : Vec<(String, path::PathBuf)>,
