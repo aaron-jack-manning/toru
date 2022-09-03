@@ -21,7 +21,7 @@ pub struct Task {
     pub data : InternalTask,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Priority {
     #[default]
     Low,
@@ -382,7 +382,6 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
             }
         }));
     }
-
     if let Some(date) = options.due_after {
         tasks = Box::new(tasks.filter(move |t| {
             match compare_due_dates(&t.data.due.map(|d| d.date()), &Some(date)) {
@@ -404,6 +403,26 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
 
             // Non empty intersection of tags means the task should be displayed
             specified_tags.intersection(&task_tags).next().is_some()
+        }));
+    }
+
+    if !options.exclude_tag.is_empty() {
+        let specified_tags : HashSet<_> = options.exclude_tag.iter().collect();
+
+        tasks = Box::new(tasks.filter(move |t| {
+            let task_tags : HashSet<_> = t.data.tags.iter().collect();
+
+            // If the task contains a tag which was supposed to be excluded, it should be filtered
+            // out
+            !specified_tags.intersection(&task_tags).next().is_some()
+        }));
+    }
+
+    if !options.priority.is_empty() {
+        let specified_priority_levels : HashSet<_> = options.priority.iter().collect();
+
+        tasks = Box::new(tasks.filter(move |t| {
+            specified_priority_levels.contains(&t.data.priority)
         }));
     }
 

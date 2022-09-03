@@ -118,6 +118,12 @@ pub struct ListOptions {
     /// Tags to include.
     #[clap(short, long)]
     pub tag : Vec<String>,
+    /// Tags to exclude.
+    #[clap(short, long)]
+    pub exclude_tag : Vec<String>,
+    /// Priority levels to include.
+    #[clap(short, long, value_enum)]
+    pub priority : Vec<tasks::Priority>,
     /// Only include tasks due before a certain date (inclusive).
     #[clap(long)]
     pub due_before : Option<chrono::NaiveDate>,
@@ -148,15 +154,14 @@ pub enum Order {
     Desc,
 }
 
-#[derive(Default, Hash, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Hash, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Column {
-    #[default]
     Due,
     Priority,
     Created,
+    Tracked,
     Tags,
     Status,
-    Tracked,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
