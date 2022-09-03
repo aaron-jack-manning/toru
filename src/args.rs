@@ -69,6 +69,9 @@ pub enum Command {
     GitIgnore,
     /// Lists tasks according to the specified fields, ordering and filters.
     List {
+        /// Use an existing profile for list options, ignoring other arguments.
+        #[clap(long)]
+        profile : Option<String>,
         #[clap(flatten)]
         options : ListOptions,
     },
@@ -104,7 +107,7 @@ pub enum Command {
     },
 }
 
-#[derive(clap::StructOpt, Debug, PartialEq, Eq)]
+#[derive(clap::StructOpt, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ListOptions {
     /// Which columns to include.
     #[clap(short, value_enum)]
@@ -195,7 +198,26 @@ pub enum ConfigCommand {
     Editor {
         /// Command to launch editor. Omit to view current editor.
         editor : Option<String>,
-    }
+    },
+    /// For working with profiles for the list command.
+    #[clap(subcommand)]
+    Profile(ProfileCommand),
+}
+
+#[derive(clap::Subcommand, Debug, PartialEq, Eq)]
+pub enum ProfileCommand {
+    New {
+        /// Name of the new profile.
+        name : String,
+        #[clap(flatten)]
+        options : ListOptions,
+    },
+    Delete {
+        /// Name of the profile to delete.
+        name : String,
+    },
+    /// List names of currently set up profiles.
+    List,
 }
 
 #[derive(clap::Subcommand, Debug, PartialEq, Eq)]

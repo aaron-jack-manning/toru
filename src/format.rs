@@ -23,6 +23,8 @@ pub static TASK : (u8, u8, u8) = (39, 174, 96);
 pub static FILE : (u8, u8, u8) = (255, 184, 184);
 // Grey
 pub static GREY : (u8, u8, u8) = (99, 110, 114);
+// Pink
+pub static PROFILE : (u8, u8, u8) = (253, 121, 168);
 
 mod due {
     pub static OVERDUE : (u8, u8, u8) = (192, 57, 43);
@@ -65,9 +67,12 @@ pub fn file(string : &str) -> colored::ColoredString {
     text(string, FILE).bold()
 }
 
-
 pub fn greyed_out(string : &str) -> colored::ColoredString {
     text(string, GREY)
+}
+
+pub fn profile(string : &str) -> colored::ColoredString {
+    text(string, PROFILE)
 }
 
 pub fn priority(priority : &tasks::Priority) -> String {

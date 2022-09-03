@@ -1,3 +1,4 @@
+use crate::args;
 use crate::error;
 use crate::format;
 
@@ -8,6 +9,13 @@ pub struct Config {
     /// Paths for all vaults, ordered according to recent usage, with current at the front.
     pub vaults : Vec<(String, path::PathBuf)>,
     pub editor : String,
+    pub profiles : Vec<Profile>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Profile {
+    name : String,
+    options : args::ListOptions,
 }
 
 impl Default for Config {
@@ -15,6 +23,7 @@ impl Default for Config {
         Self {
             vaults : Vec::default(),
             editor : String::from("vim"),
+            profiles : Vec::default(),
         }
     }
 }
@@ -62,8 +71,6 @@ impl Config {
                 Err(error::Error::Generic(format!("No vault named {} exists", format::vault(old_name))))
             }
         }
-
-
     }
 
     /// Adds the vault to the configuration.
@@ -127,6 +134,51 @@ impl Config {
                 print!("{}", path.display());
 
                 println!();
+            }
+
+            Ok(())
+        }
+    }
+    
+    pub fn create_profile(&mut self, name : String, options : args::ListOptions) -> Result<(), error::Error> {
+        if self.profiles.iter().any(|Profile { name : n, options : _ }| n == &name) {
+            Err(error::Error::Generic(format!("A profile by the name {} already exists", format::profile(&name))))
+        }
+        else {
+            self.profiles.push(Profile { name, options });
+            Ok(())
+        }
+    }
+
+    pub fn get_profile(&self, name : &String) -> Result<&args::ListOptions, error::Error> {
+        self.profiles
+            .iter()
+            .find(|Profile { name : n, options : _ }| n == name)
+            .map(|Profile { name : _, options : o }| o)
+            .ok_or(error::Error::Generic(format!("No profile by the name {} exists", format::profile(name))))
+    }
+
+    pub fn delete_profile(&mut self, name : &String) -> Result<(), error::Error> {
+        match self.profiles.iter().position(|Profile { name : n, options : _ }| n == name) {
+            Some(index) => {
+                let _ = self.profiles.swap_remove(index);
+                Ok(())
+            },
+            None => {
+                Err(error::Error::Generic(format!("No profile by the name {} exists", format::profile(name))))
+            }
+        }
+    }
+
+
+    /// Lists all profiles to stdout.
+    pub fn list_profiles(&self) -> Result<(), error::Error> {
+        if self.profiles.is_empty() {
+            Err(error::Error::Generic(format!("No profiles currently set up, try running: {}", format::command("toru config profile new <NAME> <OPTIONS>"))))
+        }
+        else {
+            for Profile { name, options : _ } in self.profiles.iter() {
+                println!("{}", format::profile(name));
             }
 
             Ok(())

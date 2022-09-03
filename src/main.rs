@@ -60,9 +60,8 @@ fn program() -> Result<(), error::Error> {
         }
     }
     else if let Command::Config(command) = command {
-        use ConfigCommand::*;
         match command {
-            Editor { editor } => {
+            ConfigCommand::Editor { editor } => {
                 match editor {
                     Some(editor) => {
                         config.editor = editor;
@@ -70,6 +69,21 @@ fn program() -> Result<(), error::Error> {
                     },
                     None => {
                         println!("Current editor command: {}", config.editor);
+                    }
+                }
+            },
+            ConfigCommand::Profile(command) => {
+                match command {
+                    ProfileCommand::New { name, options } => {
+                        config.create_profile(name.clone(), options)?;
+                        println!("Created profile {}", format::profile(&name))
+                    },
+                    ProfileCommand::Delete { name } => {
+                        config.delete_profile(&name)?;
+                        println!("Deleted profile {}", format::profile(&name))
+                    },
+                    ProfileCommand::List => {
+                        config.list_profiles()?;
                     }
                 }
             }
@@ -157,7 +171,15 @@ fn program() -> Result<(), error::Error> {
                 task.save()?;
                 println!("Marked task {} as complete", format::id(id));
             },
-            Command::List { options } => {
+            Command::List { profile, options } => {
+                let options = match profile {
+                    Some(profile) => {
+                        config.get_profile(&profile)?
+                    },
+                    None => {
+                        &options
+                    }
+                };
                 tasks::list(options, vault_folder, &state)?;
             },
             // All commands which are dealt with in if let chain at start.

@@ -355,7 +355,7 @@ fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::O
 }
 
 /// Lists all tasks in the specified vault.
-pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
+pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
 
     let mut table = comfy_table::Table::new();
     table
@@ -512,10 +512,10 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
     let mut headers = vec!["Id", "Name"];
 
     // Remove duplicate columns.
-    {
+    let unique_columns : Vec<_> = {
         let mut columns = HashSet::new();
 
-        options.column = options.column
+        options.column.clone()
             .into_iter()
             .filter(|c| {
                 if columns.contains(c) {
@@ -526,11 +526,11 @@ pub fn list(mut options : super::ListOptions, vault_folder : &path::Path, state 
                     true
                 }
             })
-            .collect();
-    }
+            .collect()
+    };
     
     use super::Column;
-    for column in &options.column {
+    for column in &unique_columns {
         match column {
             Column::Tracked => {
                 headers.push("Tracked");
