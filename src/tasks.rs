@@ -1,3 +1,4 @@
+use crate::args;
 use crate::error;
 use crate::state;
 use crate::format;
@@ -355,8 +356,50 @@ fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::O
     }
 }
 
+
+impl args::ListOptions {
+    /// Combines list options coming from a profile and from the additional arguments given. Order
+    /// of the arguments provided matters, hence the argument names (because optional arguments
+    /// from the profile are overwritten by the additional arguments).
+    pub fn combine(profile : &Self, additional : &Self) -> Self {
+        /// Joins two vectors together one after the other, creating a new allocation.
+        fn concat<T : Clone>(a : &Vec<T>, b : &Vec<T>) -> Vec<T> {
+            let mut a = a.clone();
+            a.extend(b.iter().cloned());
+            a
+        }
+
+        /// Takes two options, and prioritises the second if it is provided in the output, using
+        /// the first as a fallback, and returning None if both are None.
+        fn join_options<T : Clone>(a : &Option<T>, b : &Option<T>) -> Option<T> {
+            match (a, b) {
+                (Some(_), Some(b)) => Some(b.clone()),
+                (Some(a), None) => Some(a.clone()),
+                (None, Some(b)) => Some(b.clone()),
+                (None, None) => None,
+            }
+        }
+
+        Self {
+            column : concat(&profile.column, &additional.column),
+            order_by : join_options(&profile.order_by, &additional.order_by),
+            order : join_options(&profile.order, &profile.order),
+            tag : concat(&profile.tag, &additional.tag),
+            exclude_tag : concat(&profile.exclude_tag, &additional.exclude_tag),
+            priority : concat(&profile.priority, &additional.priority),
+            due_before : join_options(&profile.due_before, &additional.due_before),
+            due_after : join_options(&profile.due_after, &additional.due_after),
+            created_before : join_options(&profile.created_before, &additional.created_before),
+            created_after : join_options(&profile.created_after, &additional.created_after),
+            include_completed : profile.include_completed || additional.include_completed,
+            no_dependencies : profile.no_dependencies || additional.no_dependencies,
+            no_dependents : profile.no_dependents || additional.no_dependents,
+        }
+    }
+}
+
 /// Lists all tasks in the specified vault.
-pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
+pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
 
     let mut table = comfy_table::Table::new();
     table
@@ -446,9 +489,9 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
 
     // Sort the tasks.
     use super::{OrderBy, Order};
-    match options.order_by {
+    match options.order_by.unwrap_or_default() {
         OrderBy::Id => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.id.cmp(&t2.data.id));
                 },
@@ -458,7 +501,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
             }
         },
         OrderBy::Name => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.name.cmp(&t2.data.name));
                 },
@@ -468,7 +511,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
             }
         },
         OrderBy::Due => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| compare_due_dates(&t1.data.due, &t2.data.due));
                 },
@@ -478,7 +521,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
             }
         },
         OrderBy::Priority => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.priority.cmp(&t2.data.priority));
                 },
@@ -488,7 +531,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
             }
         },
         OrderBy::Created => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| t1.data.created.cmp(&t2.data.created));
                 },
@@ -498,7 +541,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
             }
         },
         OrderBy::Tracked => {
-            match options.order {
+            match options.order.unwrap_or_default() {
                 Order::Asc => {
                     tasks.sort_by(|t1, t2| TimeEntry::total(&t1.data.time_entries).cmp(&TimeEntry::total(&t2.data.time_entries)));
                 },
@@ -513,7 +556,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
     let mut headers = vec!["Id", "Name"];
 
     // Remove duplicate columns.
-    let unique_columns : Vec<_> = {
+    options.column = {
         let mut columns = HashSet::new();
 
         options.column.clone()
@@ -531,7 +574,7 @@ pub fn list(options : &super::ListOptions, vault_folder : &path::Path, state : &
     };
     
     use super::Column;
-    for column in &unique_columns {
+    for column in &options.column {
         match column {
             Column::Tracked => {
                 headers.push("Tracked");

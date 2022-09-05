@@ -171,13 +171,14 @@ fn program() -> Result<(), error::Error> {
                 task.save()?;
                 println!("Marked task {} as complete", format::id(id));
             },
-            Command::List { profile, options } => {
-                let options = match profile {
-                    Some(profile) => {
-                        config.get_profile(&profile)?
+            Command::List { profile : profile_name, options : additional } => {
+                let options = match profile_name {
+                    Some(profile_name) => {
+                        let profile = config.get_profile(&profile_name)?;
+                        ListOptions::combine(profile, &additional)
                     },
                     None => {
-                        &options
+                        additional
                     }
                 };
                 tasks::list(options, vault_folder, &state)?;

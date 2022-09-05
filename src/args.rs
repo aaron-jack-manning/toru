@@ -112,12 +112,12 @@ pub struct ListOptions {
     /// Which columns to include.
     #[clap(short, value_enum)]
     pub column : Vec<Column>,
-    /// Field to order by.
-    #[clap(long, value_enum, default_value_t=OrderBy::Id)]
-    pub order_by : OrderBy,
-    /// Sort ascending on descending.
-    #[clap(long, value_enum, default_value_t=Order::Asc)]
-    pub order : Order,
+    /// Field to order by [default: id].
+    #[clap(long, value_enum)]
+    pub order_by : Option<OrderBy>,
+    /// Sort ascending on descending [default: asc].
+    #[clap(long, value_enum)]
+    pub order : Option<Order>,
     /// Tags to include.
     #[clap(short, long)]
     pub tag : Vec<String>,
@@ -150,14 +150,14 @@ pub struct ListOptions {
     pub no_dependents : bool,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Order {
     #[default]
     Asc,
     Desc,
 }
 
-#[derive(Hash, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Hash, Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Column {
     Due,
     Priority,
@@ -167,7 +167,7 @@ pub enum Column {
     Status,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum OrderBy {
     #[default]
     Id,
