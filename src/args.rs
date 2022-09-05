@@ -69,8 +69,8 @@ pub enum Command {
     GitIgnore,
     /// Lists tasks according to the specified fields, ordering and filters.
     List {
-        /// Use an existing profile for list options, ignoring other arguments.
-        #[clap(long)]
+        /// Use an existing profile for list options, ignoring other arguments [alias: pr].
+        #[clap(long, alias="pr")]
         profile : Option<String>,
         #[clap(flatten)]
         options : ListOptions,
