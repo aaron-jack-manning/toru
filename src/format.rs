@@ -37,6 +37,7 @@ pub mod priority {
     pub static LOW : (u8, u8, u8) = (46, 204, 113);
     pub static MEDIUM : (u8, u8, u8) = (241, 196, 15);
     pub static HIGH : (u8, u8, u8) = (231, 76, 60);
+    pub static BACKLOG : (u8, u8, u8) = (99, 110, 114);
 }
 
 fn text(string : &str, colour : (u8, u8, u8)) -> colored::ColoredString {
@@ -78,6 +79,7 @@ pub fn profile(string : &str) -> colored::ColoredString {
 pub fn priority(priority : &tasks::Priority) -> String {
     use tasks::Priority::*;
     let priority = match priority {
+        Backlog => text("backlog", priority::BACKLOG),
         Low => text("low", priority::LOW),
         Medium => text("medium", priority::MEDIUM),
         High => text("high", priority::HIGH),
@@ -206,6 +208,7 @@ pub mod cell {
     pub fn priority(priority : &tasks::Priority) -> comfy_table::Cell {
         use tasks::Priority::*;
         match priority {
+            Backlog => comfy_table::Cell::new("backlog").fg(comfy_table::Color::from(super::priority::BACKLOG)),
             Low => comfy_table::Cell::new("low").fg(comfy_table::Color::from(super::priority::LOW)),
             Medium => comfy_table::Cell::new("medium").fg(comfy_table::Color::from(super::priority::MEDIUM)),
             High => comfy_table::Cell::new("high").fg(comfy_table::Color::from(super::priority::HIGH)),

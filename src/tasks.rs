@@ -23,6 +23,7 @@ pub struct Task {
 
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
 pub enum Priority {
+    Backlog,
     #[default]
     Low,
     Medium,
@@ -637,15 +638,4 @@ impl fmt::Display for Duration {
     }
 }
 
-impl fmt::Display for Priority {
-    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Priority::*;
-        let priority = match self {
-            Low => "low",
-            Medium => "medium",
-            High => "high",
-        };
-        write!(f, "{}", priority)
-    }
-}
 
