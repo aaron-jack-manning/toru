@@ -11,7 +11,7 @@ use std::mem;
 use std::cmp;
 use std::path;
 use std::io::{Write, Seek};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap, BTreeSet};
 use chrono::SubsecRound;
 
 pub type Id = u64;
@@ -49,7 +49,7 @@ pub struct InternalTask {
     pub id : Id,
     pub name : String,
     pub tags : HashSet<String>,
-    pub dependencies : HashSet<Id>,
+    pub dependencies : BTreeSet<Id>,
     pub priority : Priority,
     pub due : Option<chrono::NaiveDateTime>,
     pub created : chrono::NaiveDateTime,

@@ -4,19 +4,19 @@ use crate::format;
 use crate::tasks::Id;
 
 use std::fmt::Write;
-use std::collections::{HashSet, HashMap, BTreeSet};
+use std::collections::{HashSet, BTreeSet, BTreeMap};
 use serde_with::{serde_as, DisplayFromStr};
 
 #[serde_as]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Graph {
-    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
-    pub edges : HashMap<Id, HashSet<Id>>,
+    #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
+    pub edges : BTreeMap<Id, BTreeSet<Id>>,
 }
 
 impl Graph {
     pub fn create(tasks : Vec<tasks::Task>) -> Self {
-        let mut edges = HashMap::with_capacity(tasks.len());
+        let mut edges = BTreeMap::new();
 
         for task in tasks {
             edges.insert(task.data.id, task.data.dependencies);
@@ -32,7 +32,7 @@ impl Graph {
     }
 
     pub fn insert_node(&mut self, node : Id) -> bool {
-        self.edges.insert(node, HashSet::new()).is_none()
+        self.edges.insert(node, BTreeSet::new()).is_none()
     }
 
     pub fn insert_edge(&mut self, first : Id, second : Id) -> Result<bool, error::Error> {

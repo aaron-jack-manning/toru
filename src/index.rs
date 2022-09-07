@@ -4,19 +4,19 @@ use crate::format;
 use crate::tasks::Id;
 
 use std::fmt::Write;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use serde_with::{serde_as, DisplayFromStr};
 
 #[serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Index {
-    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
-    map : HashMap<String, Vec<Id>>
+    #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
+    map : BTreeMap<String, Vec<Id>>
 }
 
 impl Index {
     pub fn create(tasks : &Vec<tasks::Task>) -> Index {
-        let mut map : HashMap<String, Vec<Id>> = HashMap::with_capacity(tasks.len());
+        let mut map : BTreeMap<String, Vec<Id>> = BTreeMap::new();
         for task in tasks {
             match map.get_mut(&task.data.name) {
                 Some(ids) => {
