@@ -85,10 +85,6 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
         if edited_task.data.id != task.data.id {
             Err(error::Error::Generic(String::from("You cannot change the ID of a task in a direct edit")))
         }
-        // Enforce non numeric name invariant.
-        else if edited_task.data.name.chars().all(|c| c.is_numeric()) {
-            Err(error::Error::Generic(String::from("Name must not be purely numeric")))
-        }
         else {
             // Dependencies were edited so the graph needs to be updated.
             if edited_task.data.dependencies != task.data.dependencies {

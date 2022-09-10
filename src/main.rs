@@ -119,8 +119,8 @@ fn program() -> Result<(), error::Error> {
 
         match command {
             Command::New { name, info, tag, dependency, priority, due } => {
-                let task = tasks::Task::new(name, info, tag, dependency, priority, due, vault_folder, &mut state)?;
-                println!("Created task {} (ID: {})", format::task(&task.data.name), format::id(task.data.id));
+                let id = tasks::Task::new(name.clone(), info, tag, dependency, priority, due, vault_folder, &mut state)?;
+                println!("Created task {} (ID: {})", format::task(&name), format::id(id));
             },
             Command::Delete { id_or_name } => {
                 let id = state.data.index.lookup(&id_or_name)?;

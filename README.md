@@ -79,10 +79,3 @@ Then you can run `toru new` to create your first task.
 ## Backup and Syncing
 
 Toru stores tasks and other metadata locally in the folder of the vault in the interest of making that data easily accessible for backups, syncing across devices, and to be easy to export from. However, because Toru uses sequential IDs, sharing a vault across computers asynchronously, such as with Git, can cause different notes to be in conflict with each other. If all vault metadata is synced across devices completely before use, such conflicts can be avoided.
-
----
-
-## Planned Changes
-
-- Validate invariants at the point of saving, to create consistency across creating and editing notes.
-- Convenient options with the edit command so that editing the raw file isn't the only option

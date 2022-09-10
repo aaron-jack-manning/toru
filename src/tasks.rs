@@ -16,7 +16,8 @@ pub type Id = u64;
 
 pub struct Task {
     pub path : path::PathBuf,
-    file : fs::File,
+    // This should only be None for a new task, in which case it should be written from the path.
+    file : Option<fs::File>,
     pub data : InternalTask,
 }
 
@@ -223,23 +224,13 @@ impl TimeEntry {
 
 impl Task {
     /// Creates a new task from the input data.
-    pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, due : Option<chrono::NaiveDateTime>, vault_folder : &path::Path, state : &mut state::State) -> Result<Self, error::Error> {
-
-        // Exclude numeric names in the interest of allowing commands that take in ID or name.
-        if name.chars().all(|c| c.is_numeric()) {
-            return Err(error::Error::Generic(String::from("Name must not be purely numeric")));
-        };
+    pub fn new(name : String, info : Option<String>, tags : Vec<String>, dependencies : Vec<Id>, priority : Option<Priority>, due : Option<chrono::NaiveDateTime>, vault_folder : &path::Path, state : &mut state::State) -> Result<Id, error::Error> {
 
         // Update the state with the new next Id.
         let id = state.data.next_id;
         state.data.next_id += 1;
         
         let path = vault_folder.join("tasks").join(&format!("{}.toml", id));
-
-        let mut file = fs::File::options()
-            .write(true)
-            .create(true)
-            .open(&path)?;
 
         // Adding to dependency graph appropriately.
         state.data.deps.insert_node(id);
@@ -267,19 +258,17 @@ impl Task {
             completed : None,
         };
 
-        let file_contents = toml::to_string(&data)?;
-
-        file.set_len(0)?;
-        file.seek(io::SeekFrom::Start(0))?;
-        file.write_all(file_contents.as_bytes())?;
-
         state.data.index.insert(data.name.clone(), id);
 
-        Ok(Task {
+        let task = Task {
             path,
-            file,
+            file : None,
             data,
-        })
+        };
+
+        task.save()?;
+
+        Ok(id)
     }
 
     /// Loads a task directly from its path, for use with the temporary edit file.
@@ -300,7 +289,7 @@ impl Task {
 
         Ok(Self {
             path,
-            file,
+            file : Some(file),
             data,
         })
     }
@@ -360,17 +349,36 @@ impl Task {
 
     /// Saves the in memory task data to the corresponding file.
     pub fn save(self) -> Result<(), error::Error> {
+
+        // Enforce any additional invariants which need to be checked for both edits and now tasks
+        // at the point of save.
+        {
+            // Exclude numeric names in the interest of allowing commands that take in ID or name.
+            if self.data.name.chars().all(|c| c.is_numeric()) {
+                return Err(error::Error::Generic(String::from("Name must not be purely numeric")));
+            };
+        }
+
         let Self {
-            path : _,
-            mut file,
+            path,
+            file,
             data,
         } = self;
 
         let file_contents = toml::to_string(&data)?;
 
-        file.set_len(0)?;
-        file.seek(io::SeekFrom::Start(0))?;
-        file.write_all(file_contents.as_bytes())?;
+        // Check if the file exists, if not it is a new task and the file must be written from the
+        // path.
+        match file {
+            Some(mut file) => {
+                file.set_len(0)?;
+                file.seek(io::SeekFrom::Start(0))?;
+                file.write_all(file_contents.as_bytes())?;
+            },
+            None => {
+                fs::write(path, file_contents.as_bytes())?;
+            }
+        }
 
         Ok(())
     }
