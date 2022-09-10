@@ -1,12 +1,10 @@
-use crate::args;
 use crate::error;
 use crate::state;
 use crate::format;
 
 use std::io;
 use std::fs;
-use std::fmt;
-use std::ops;
+use std::str;
 use std::mem;
 use std::cmp;
 use std::path;
@@ -22,28 +20,6 @@ pub struct Task {
     pub data : InternalTask,
 }
 
-#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
-pub enum Priority {
-    Backlog,
-    #[default]
-    Low,
-    Medium,
-    High,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TimeEntry {
-    pub logged_date : chrono::NaiveDate,
-    pub message : Option<String>,
-    pub duration : Duration,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
-pub struct Duration {
-    hours : u16,
-    minutes : u16,
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InternalTask {
     pub id : Id,
@@ -56,6 +32,193 @@ pub struct InternalTask {
     pub completed : Option<chrono::NaiveDateTime>,
     pub info : Option<String>,
     pub time_entries : Vec<TimeEntry>,
+}
+
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum, serde::Serialize, serde::Deserialize)]
+pub enum Priority {
+    Backlog,
+    #[default]
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Duration {
+    hours : u16,
+    minutes : u16,
+}
+
+impl Duration {
+    pub fn zero() -> Self {
+        Self {
+            hours : 0,
+            minutes : 0,
+        }
+    }
+}
+
+pub mod duration {
+    use super::Duration;
+
+    use std::ops;
+    use std::str;
+    use std::fmt;
+
+    /// Serialize to custom format HH:MM where MM is padded to be two characters wide and HH can be
+    /// arbitrarily large.
+    impl serde::Serialize for Duration {
+        fn serialize<S : serde::Serializer>(&self, serializer : S) -> Result<S::Ok, S::Error> {
+            serializer.serialize_str(&format!("{}:{:0>2}", self.hours, self.minutes))
+        }
+    }
+
+    /// Deserialize from custom format HH:MM where MM is an integer between 0 and 59 inclusive, and
+    /// HH is some integer representable as a u16.
+    /// The width of MM is not enforced for deserialization.
+    impl<'de> serde::Deserialize<'de> for Duration {
+        fn deserialize<D : serde::Deserializer<'de>>(deserializer : D) -> Result<Self, D::Error> {
+            let raw = String::deserialize(deserializer)?;
+
+            use std::str::FromStr;
+            Self::from_str(&raw)
+            .map_err(|x| serde::de::Error::invalid_value(serde::de::Unexpected::Str(&raw), &x.serde_expected()))
+        }
+    }
+
+    /// Custom type for errors when converting duration from str, with error messages for clap and
+    /// serde respectively.
+    #[derive(Debug)]
+    pub enum DurationRead {
+        /// For when the number of minutes is not less than 60.
+        Minutes,
+        /// For when either value cannot be parsed into a u16.
+        Range,
+        /// For general formatting error (i.e. split at colon doesn't produce two values).
+        General,
+    }
+
+    impl fmt::Display for DurationRead {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                DurationRead::Minutes => {
+                    write!(f, "the number of minutes must be between 0 and 59 inclusive")
+                },
+                DurationRead::Range => {
+                    write!(f, "the number of hours and minutes must be representable as a u16")
+                },
+                DurationRead::General => {
+                    write!(f, "duration must be in the format HH:MM where HH is any integer (representable as a u16) and MM is an integer between 0 and 59 inclusive")
+                },
+            }
+        }
+    }
+
+    impl std::error::Error for DurationRead { }
+
+    impl DurationRead {
+        /// Gives a str of what was expected (and not provided) when serializing.
+        pub fn serde_expected(&self) -> &'static str {
+            match self {
+                DurationRead::Minutes => {
+                    "the number of minutes to be an integer between 0 and 59 inclusive"
+                },
+                DurationRead::Range => {
+                    "the number of hours and minutes to be representable as a u16"
+                },
+                DurationRead::General => {
+                    "a duration in the format HH:MM where HH is any integer (representable as a u16) and MM is an integer between 0 and 59 inclusive"
+                },
+            }
+        }
+    }
+
+    impl str::FromStr for Duration {
+        type Err = DurationRead;
+
+        fn from_str(s : &str) -> Result<Self, Self::Err> {
+            if let &[h, m] = &s.split(':').collect::<Vec<&str>>()[..] {
+                if let (Ok(hours), Ok(minutes)) = (h.parse::<u16>(), m.parse::<u16>()) {
+                    if minutes < 60 {
+                        Ok(Self {
+                            hours,
+                            minutes,
+                        })
+                    }
+                    else {
+                        Err(DurationRead::Minutes)
+                    }
+                }
+                else {
+                    Err(DurationRead::Range)
+                }
+            }
+            else {
+                Err(DurationRead::General)
+            }
+        }
+    }
+
+    impl ops::Add for Duration {
+        type Output = Self;
+
+        fn add(self, other : Self) -> Self::Output {
+
+            Self {
+                hours : self.hours + other.hours + (self.minutes + other.minutes) / 60,
+                minutes : (self.minutes + other.minutes) % 60,
+            }
+        }
+    }
+
+    impl ops::Div<usize> for Duration {
+        type Output = Self;
+
+        fn div(self, divisor : usize) -> Self::Output {
+            let total_mins = f64::from(self.hours * 60 + self.minutes);
+            let divided_mins = total_mins / (divisor as f64);
+            let divided_mins = divided_mins.round() as u16;
+
+            Self {
+                hours : divided_mins / 60,
+                minutes : divided_mins % 60,
+            }
+        }
+    }
+
+    /// Same display format as serialization.
+    impl fmt::Display for Duration {
+        fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}:{:0>2}", self.hours, self.minutes)
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TimeEntry {
+    pub logged_date : chrono::NaiveDate,
+    pub message : Option<String>,
+    pub duration : Duration,
+}
+
+impl TimeEntry {
+    /// Adds up the times from a collection of time entries.
+    pub fn total(entries : &[TimeEntry]) -> Duration {
+        entries
+        .iter()
+        .map(|e| e.duration)
+        .fold(Duration::zero(), |a, d| a + d)
+    }
+
+    /// Creates a new TimeEntry, correctly validating and setting defaults.
+    pub fn new(duration : Duration, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
+
+        Self {
+            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
+            message,
+            duration,
+        }
+    }
 }
 
 impl Task {
@@ -306,48 +469,9 @@ impl Task {
     }
 }
 
-impl Duration {
-    pub fn zero() -> Self {
-        Self {
-            minutes : 0,
-            hours : 0,
-        }
-    }
-
-    pub fn satisfies_invariant(&self) -> bool {
-        self.minutes < 60
-    }
-}
-
-impl TimeEntry {
-    /// Adds up the times from a collection of time entries.
-    fn total(entries : &[TimeEntry]) -> Duration {
-        entries
-        .iter()
-        .map(|e| e.duration)
-        .fold(Duration::zero(), |a, d| a + d)
-    }
-
-    /// Creates a new TimeEntry, correctly validating and setting defaults.
-    pub fn new(hours : u16, minutes : u16, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
-
-        let (hours, minutes) = {
-            (hours + minutes / 60, minutes % 60)
-        };
-
-        Self {
-            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
-            message,
-            duration : Duration {
-                hours,
-                minutes,
-            }
-        }
-    }
-}
 
 /// Compares due dates correctly, treating None as at infinity.
-fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::Ordering {
+pub fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::Ordering {
     match (first, second) {
         (None, None) => cmp::Ordering::Equal,
         (Some(_), None) => cmp::Ordering::Less,
@@ -355,330 +479,4 @@ fn compare_due_dates<T : Ord>(first : &Option<T>, second : &Option<T>) -> cmp::O
         (Some(first), Some(second)) => first.cmp(second),
     }
 }
-
-
-impl args::ListOptions {
-    /// Combines list options coming from a profile and from the additional arguments given. Order
-    /// of the arguments provided matters, hence the argument names (because optional arguments
-    /// from the profile are overwritten by the additional arguments).
-    pub fn combine(profile : &Self, additional : &Self) -> Self {
-        /// Joins two vectors together one after the other, creating a new allocation.
-        fn concat<T : Clone>(a : &Vec<T>, b : &Vec<T>) -> Vec<T> {
-            let mut a = a.clone();
-            a.extend(b.iter().cloned());
-            a
-        }
-
-        /// Takes two options, and prioritises the second if it is provided in the output, using
-        /// the first as a fallback, and returning None if both are None.
-        fn join_options<T : Clone>(a : &Option<T>, b : &Option<T>) -> Option<T> {
-            match (a, b) {
-                (Some(_), Some(b)) => Some(b.clone()),
-                (Some(a), None) => Some(a.clone()),
-                (None, Some(b)) => Some(b.clone()),
-                (None, None) => None,
-            }
-        }
-
-        Self {
-            column : concat(&profile.column, &additional.column),
-            order_by : join_options(&profile.order_by, &additional.order_by),
-            order : join_options(&profile.order, &profile.order),
-            tag : concat(&profile.tag, &additional.tag),
-            exclude_tag : concat(&profile.exclude_tag, &additional.exclude_tag),
-            priority : concat(&profile.priority, &additional.priority),
-            due_before : join_options(&profile.due_before, &additional.due_before),
-            due_after : join_options(&profile.due_after, &additional.due_after),
-            created_before : join_options(&profile.created_before, &additional.created_before),
-            created_after : join_options(&profile.created_after, &additional.created_after),
-            include_completed : profile.include_completed || additional.include_completed,
-            no_dependencies : profile.no_dependencies || additional.no_dependencies,
-            no_dependents : profile.no_dependents || additional.no_dependents,
-        }
-    }
-}
-
-/// Lists all tasks in the specified vault.
-pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state : &state::State) -> Result<(), error::Error> {
-
-    let mut table = comfy_table::Table::new();
-    table
-        .load_preset(comfy_table::presets::UTF8_FULL)
-        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-        .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
-
-
-    let mut tasks : Box<dyn Iterator<Item = Task>> = Box::new(Task::load_all(vault_folder, true)?.into_iter());
-
-    // Filter the tasks.
-    if let Some(date) = options.created_before {
-        tasks = Box::new(tasks.filter(move |t| t.data.created.date() <= date));
-    }
-    if let Some(date) = options.created_after {
-        tasks = Box::new(tasks.filter(move |t| t.data.created.date() >= date));
-    }
-
-    if let Some(date) = options.due_before {
-        tasks = Box::new(tasks.filter(move |t| {
-            match compare_due_dates(&t.data.due.map(|d| d.date()), &Some(date)) {
-                cmp::Ordering::Less | cmp::Ordering::Equal => true,
-                cmp::Ordering::Greater => false,
-            }
-        }));
-    }
-    if let Some(date) = options.due_after {
-        tasks = Box::new(tasks.filter(move |t| {
-            match compare_due_dates(&t.data.due.map(|d| d.date()), &Some(date)) {
-                cmp::Ordering::Greater | cmp::Ordering::Equal => true,
-                cmp::Ordering::Less => false,
-            }
-        }));
-    }
-
-    if !options.include_completed {
-        tasks = Box::new(tasks.filter(|t| t.data.completed.is_none()));
-    }
-
-    if !options.tag.is_empty() {
-        let specified_tags : HashSet<_> = options.tag.iter().collect();
-
-        tasks = Box::new(tasks.filter(move |t| {
-            let task_tags : HashSet<_> = t.data.tags.iter().collect();
-
-            // Non empty intersection of tags means the task should be displayed
-            specified_tags.intersection(&task_tags).next().is_some()
-        }));
-    }
-
-    if !options.exclude_tag.is_empty() {
-        let specified_tags : HashSet<_> = options.exclude_tag.iter().collect();
-
-        tasks = Box::new(tasks.filter(move |t| {
-            let task_tags : HashSet<_> = t.data.tags.iter().collect();
-
-            // If the task contains a tag which was supposed to be excluded, it should be filtered
-            // out
-            !specified_tags.intersection(&task_tags).next().is_some()
-        }));
-    }
-
-    if !options.priority.is_empty() {
-        let specified_priority_levels : HashSet<_> = options.priority.iter().collect();
-
-        tasks = Box::new(tasks.filter(move |t| {
-            specified_priority_levels.contains(&t.data.priority)
-        }));
-    }
-
-    if options.no_dependencies {
-        tasks = Box::new(tasks.filter(move |t| {
-            t.data.dependencies.is_empty()
-        }));
-    }
-
-    if options.no_dependents {
-        let tasks_with_dependents = state.data.deps.get_tasks_with_dependents();
-
-        tasks = Box::new(tasks.filter(move |t| {
-            !tasks_with_dependents.contains(&t.data.id)
-        }));
-    }
-
-    let mut tasks : Vec<Task> = tasks.collect();
-
-
-    // Sort the tasks.
-    use super::{OrderBy, Order};
-    match options.order_by.unwrap_or_default() {
-        OrderBy::Id => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| t1.data.id.cmp(&t2.data.id));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| t2.data.id.cmp(&t1.data.id));
-                },
-            }
-        },
-        OrderBy::Name => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| t1.data.name.cmp(&t2.data.name));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| t2.data.name.cmp(&t1.data.name));
-                },
-            }
-        },
-        OrderBy::Due => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| compare_due_dates(&t1.data.due, &t2.data.due));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| compare_due_dates(&t2.data.due, &t1.data.due));
-                },
-            }
-        },
-        OrderBy::Priority => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| t1.data.priority.cmp(&t2.data.priority));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| t2.data.priority.cmp(&t1.data.priority));
-                },
-            }
-        },
-        OrderBy::Created => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| t1.data.created.cmp(&t2.data.created));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| t2.data.created.cmp(&t1.data.created));
-                },
-            }
-        },
-        OrderBy::Tracked => {
-            match options.order.unwrap_or_default() {
-                Order::Asc => {
-                    tasks.sort_by(|t1, t2| TimeEntry::total(&t1.data.time_entries).cmp(&TimeEntry::total(&t2.data.time_entries)));
-                },
-                Order::Desc => {
-                    tasks.sort_by(|t1, t2| TimeEntry::total(&t2.data.time_entries).cmp(&TimeEntry::total(&t1.data.time_entries)));
-                },
-            }
-        }
-    }
-
-    // Include the required columns
-    let mut headers = vec!["Id", "Name"];
-
-    // Remove duplicate columns.
-    options.column = {
-        let mut columns = HashSet::new();
-
-        options.column.clone()
-            .into_iter()
-            .filter(|c| {
-                if columns.contains(c) {
-                    false
-                }
-                else {
-                    columns.insert(c.clone());
-                    true
-                }
-            })
-            .collect()
-    };
-    
-    use super::Column;
-    for column in &options.column {
-        match column {
-            Column::Tracked => {
-                headers.push("Tracked");
-            },
-            Column::Due => {
-                headers.push("Due");
-            },
-            Column::Tags => {
-                headers.push("Tags");
-            },
-            Column::Priority => {
-                headers.push("Priority");
-            },
-            Column::Status => {
-                headers.push("Status");
-            },
-            Column::Created => {
-                headers.push("Created");
-            },
-        }
-    }
-
-    table.set_header(headers);
-
-    for task in tasks {
-
-        use comfy_table::Cell;
-        let mut row = vec![Cell::from(task.data.id), Cell::from(task.data.name)];
-
-        for column in &options.column {
-            match column {
-                Column::Tracked => {
-                    let duration = TimeEntry::total(&task.data.time_entries);
-                    row.push(
-                        Cell::from(if duration == Duration::zero() { String::new() } else { duration.to_string() })
-                    );
-                },
-                Column::Due => {
-                    row.push(match task.data.due {
-                        Some(due) => format::cell::due_date(&due, task.data.completed.is_none()),
-                        None => Cell::from(String::new())
-                    });
-                },
-                Column::Tags => {
-                    row.push(Cell::new(format::hash_set(&task.data.tags)?));
-                },
-                Column::Priority => {
-                    row.push(format::cell::priority(&task.data.priority));
-                },
-                Column::Status => {
-                    row.push(
-                        Cell::new(if task.data.completed.is_some() {
-                            String::from("complete")
-                        }
-                        else {
-                            String::from("incomplete")
-                        })
-                    );
-                },
-                Column::Created => {
-                    row.push(Cell::new(task.data.created.round_subsecs(0).to_string()));
-                },
-            }
-        }
-
-        table.add_row(row);
-    }
-
-    println!("{}", table);
-
-    Ok(())
-}
-
-impl ops::Add for Duration {
-    type Output = Self;
-
-    fn add(self, other : Self) -> Self::Output {
-
-        Self {
-            hours : self.hours + other.hours + (self.minutes + other.minutes) / 60,
-            minutes : (self.minutes + other.minutes) % 60,
-        }
-    }
-}
-
-impl ops::Div<usize> for Duration {
-    type Output = Self;
-
-    fn div(self, divisor : usize) -> Self::Output {
-        let total_mins = f64::from(self.hours * 60 + self.minutes);
-        let divided_mins = total_mins / (divisor as f64);
-        let divided_mins = divided_mins.round() as u16;
-
-        Self {
-            hours : divided_mins / 60,
-            minutes : divided_mins % 60,
-        }
-    }
-}
-
-impl fmt::Display for Duration {
-    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{:0>2}", self.hours, self.minutes)
-    }
-}
-
 

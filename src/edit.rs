@@ -75,13 +75,6 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
     else {
         let mut edited_task = tasks::Task::load_direct(temp_path.clone(), true)?;
 
-        // Enforce time entry duration invariant.
-        for entry in &edited_task.data.time_entries {
-            if !entry.duration.satisfies_invariant() {
-                return Err(error::Error::Generic(String::from("Task duration must not have a number of minutes greater than 60")))
-            }
-        }
-
         // Make sure ID is not changed.
         if edited_task.data.id != task.data.id {
             Err(error::Error::Generic(String::from("You cannot change the ID of a task in a direct edit")))

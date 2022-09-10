@@ -81,10 +81,7 @@ pub enum Command {
     /// For tracking time against a task.
     Track {
         id_or_name : String,
-        #[clap(short='H', default_value_t=0)]
-        hours : u16,
-        #[clap(short='M', default_value_t=0)]
-        minutes : u16,
+        duration : tasks::Duration,
         /// Date for the time entry [default: Today]
         #[clap(short, long)]
         date : Option<chrono::NaiveDate>,

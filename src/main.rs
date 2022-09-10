@@ -1,6 +1,7 @@
 mod vcs;
 mod edit;
 mod args;
+mod list;
 mod vault;
 mod index;
 mod error;
@@ -146,10 +147,10 @@ fn program() -> Result<(), error::Error> {
                 }
                 println!("Updated task {}", format::id(id));
             },
-            Command::Track { id_or_name, hours, minutes, date, message } => {
+            Command::Track { id_or_name, duration, date, message } => {
                 let id = state.data.index.lookup(&id_or_name)?;
                 let mut task = tasks::Task::load(id, vault_folder, false)?;
-                let entry =  tasks::TimeEntry::new(hours, minutes, date, message);
+                let entry =  tasks::TimeEntry::new(duration, date, message);
                 task.data.time_entries.push(entry);
                 task.save()?;
             },
@@ -181,7 +182,7 @@ fn program() -> Result<(), error::Error> {
                         additional
                     }
                 };
-                tasks::list(options, vault_folder, &state)?;
+                list::list(options, vault_folder, &state)?;
             },
             // All commands which are dealt with in if let chain at start.
             Command::Vault(_) | Command::Config(_) | Command::Git { args : _ } | Command::Svn { args : _ } | Command::Switch { name : _ } | Command::GitIgnore | Command::SvnIgnore => unreachable!(),
