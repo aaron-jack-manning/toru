@@ -73,7 +73,13 @@ pub fn edit_raw(id : Id, vault_folder : path::PathBuf, editor : &str, state : &m
         }
     }
     else {
-        let mut edited_task = tasks::Task::load_direct(temp_path.clone(), true)?;
+        let mut edited_task = tasks::Task::load_direct(temp_path.clone(), true)
+            .map_err(|err| {
+                match err {
+                    error::Error::TomlDe(err) => error::Error::Generic(format!("Bad toml data - {}", err)),
+                    x => x,
+                }
+            })?;
 
         // Make sure ID is not changed.
         if edited_task.data.id != task.data.id {
