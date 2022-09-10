@@ -31,7 +31,7 @@ pub enum Command {
         dependency : Vec<Id>,
         #[clap(short, long, value_enum)]
         priority : Option<tasks::Priority>,
-        /// Due date, expecting format yyyy-mm-ddThh:mm:ss
+        /// Due date, [format: yyyy-mm-ddThh:mm:ss].
         #[clap(long)]
         due : Option<chrono::NaiveDateTime>,
     },
@@ -139,7 +139,7 @@ pub struct ListOptions {
     /// Include completed tasks in the list.
     #[clap(long)]
     pub include_completed : bool,
-    /// Only include tasks with no dependencies [alias: bottom-level].
+    /// Only include tasks with no (incomplete) dependencies [alias: bottom-level].
     #[clap(long, alias="bottom-level")]
     pub no_dependencies : bool,
     /// Only include tasks with no dependents [alias: top-level].

@@ -3,10 +3,11 @@ use crate::error;
 use crate::state;
 use crate::tasks;
 use crate::format;
+use crate::tasks::Id;
 
 use std::cmp;
 use std::path;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use chrono::SubsecRound;
 
 impl args::ListOptions {
@@ -60,7 +61,12 @@ pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state :
         .set_content_arrangement(comfy_table::ContentArrangement::Dynamic);
 
 
-    let mut tasks : Box<dyn Iterator<Item = tasks::Task>> = Box::new(tasks::Task::load_all(vault_folder, true)?.into_iter());
+    let tasks = tasks::Task::load_all(vault_folder, true)?;
+
+    // Collect the Ids of completed tasks for the sake of checking if a task has no incomplete dependencies.
+    let completed_ids : HashSet<Id> = tasks.iter().filter_map(|t| if t.data.completed.is_some() { Some(t.data.id) } else { None }).collect();
+
+    let mut tasks : Box<dyn Iterator<Item = tasks::Task>> = Box::new(tasks.into_iter());
 
     // Filter the tasks.
     if let Some(date) = options.created_before {
@@ -122,9 +128,10 @@ pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state :
         }));
     }
 
+    // Checks that a task has no incomplete dependencies (these dependencies are direct only).
     if options.no_dependencies {
         tasks = Box::new(tasks.filter(move |t| {
-            t.data.dependencies.is_empty()
+            t.data.dependencies.iter().all(|d| completed_ids.contains(&d))
         }));
     }
 
@@ -136,8 +143,7 @@ pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state :
         }));
     }
 
-    let mut tasks : Vec<tasks::Task> = tasks.collect();
-
+    let mut tasks : Vec<_> = tasks.collect();
 
     // Sort the tasks.
     use super::{OrderBy, Order};

@@ -86,4 +86,3 @@ Toru stores tasks and other metadata locally in the folder of the vault in the i
 
 - Validate invariants at the point of saving, to create consistency across creating and editing notes.
 - Convenient options with the edit command so that editing the raw file isn't the only option
-- Check for if dependencies are complete when listing notes with no dependencies.
