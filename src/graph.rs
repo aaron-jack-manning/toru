@@ -105,6 +105,21 @@ impl Graph {
         None
     }
 
+    /// Traverses a notes dependencies to get the set of all dependencies, direct and indirect.
+    pub fn get_nested_deps(&self, id : Id) -> HashSet<Id> {
+        fn helper(graph : &Graph, curr : &Id, output : &mut HashSet<Id>) {
+            for dep in graph.edges.get(curr).unwrap() {
+                output.insert(*dep);
+                helper(graph, dep, output)
+            }
+        }
+
+        let mut output = HashSet::new();
+        helper(self, &id, &mut output);
+
+        output
+    }
+
     fn find_cycle_local(&self, start : Id, unvisited : &mut BTreeSet<Id>, current_path_visited : &mut HashSet<Id>) -> Option<Vec<Id>> {
 
         // If already visited in the current path, then there is a cycle

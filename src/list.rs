@@ -7,7 +7,7 @@ use crate::tasks::Id;
 
 use std::cmp;
 use std::path;
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
 use chrono::SubsecRound;
 
 impl args::ListOptions {
@@ -128,10 +128,13 @@ pub fn list(mut options : args::ListOptions, vault_folder : &path::Path, state :
         }));
     }
 
-    // Checks that a task has no incomplete dependencies (these dependencies are direct only).
+    // Checks that a task has no incomplete dependencies.
     if options.no_dependencies {
         tasks = Box::new(tasks.filter(move |t| {
-            t.data.dependencies.iter().all(|d| completed_ids.contains(&d))
+            // Get all dependencies (including indirect ones).
+            let all_dependencies = state.data.deps.get_nested_deps(t.data.id);
+            // Check that all of those dependencies are completed.
+            all_dependencies.iter().all(|d| completed_ids.contains(&d))
         }));
     }
 
