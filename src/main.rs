@@ -127,7 +127,14 @@ fn program() -> Result<(), error::Error> {
                 let task = tasks::Task::load(id, vault_folder, false)?;
                 let name = task.data.name.clone();
                 state.data.index.remove(task.data.name.clone(), task.data.id);
-                state.data.deps.remove_node(task.data.id);
+                // Removing the task from others which list it as a dependency.
+                if let (true, dependents) = state.data.deps.remove_node(task.data.id) {
+                    for dependent in dependents {
+                        let mut task = tasks::Task::load(dependent, vault_folder, false)?;
+                        task.data.dependencies.remove(&id);
+                        task.save()?;
+                    }
+                }
                 task.delete()?;
 
                 println!("Deleted task {} (ID: {})", format::task(&name), format::id(id));

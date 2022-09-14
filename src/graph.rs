@@ -48,15 +48,21 @@ impl Graph {
         }
     }
 
-    pub fn remove_node(&mut self, node : Id) -> bool {
+    /// Returns a boolean indicating if the graph was changed (it contained the node) and a
+    /// set of all dependents on the removed node.
+    pub fn remove_node(&mut self, node : Id) -> (bool, HashSet<Id>) {
+        let mut dependents = HashSet::new();
+
         if self.edges.remove(&node).is_some() {
-            for outgoing in self.edges.values_mut() {
-                outgoing.remove(&node);
+            for (&dependent, outgoing) in &mut self.edges {
+                if outgoing.remove(&node) {
+                    dependents.insert(dependent);
+                }
             }
-            true
+            (true, dependents)
         }
         else {
-            false
+            (false, dependents)
         }
     }
 
