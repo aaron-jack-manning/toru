@@ -215,7 +215,7 @@ impl TimeEntry {
     pub fn new(duration : Duration, date : Option<chrono::NaiveDate>, message : Option<String>) -> Self {
 
         Self {
-            logged_date : date.unwrap_or(chrono::Utc::now().naive_local().date()),
+            logged_date : date.unwrap_or(chrono::Local::now().naive_local().date()),
             message,
             duration,
         }

@@ -42,7 +42,7 @@ pub fn time_per_tag(days : u16, vault_folder : &path::Path) -> Result<(), error:
         let mut time = tasks::Duration::zero();
 
         for entry in &task.data.time_entries {
-            if chrono::Utc::now().naive_local().date() - entry.logged_date < chrono::Duration::days(i64::from(days)) {
+            if chrono::Local::now().naive_local().date() - entry.logged_date < chrono::Duration::days(i64::from(days)) {
                 time = time + entry.duration;
             }
         }
